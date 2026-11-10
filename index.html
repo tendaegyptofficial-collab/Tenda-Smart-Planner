@@ -1,0 +1,2966 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tenda | مخطط وحاسبة أنظمة كاميرات المراقبة | Tenda Smart Planner PRO v1.0</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Cairo -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- html2pdf.js for Direct A4 PDF Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        :root {
+            --tenda-orange: #FF5500;
+            --tenda-orange-dark: #E04B00;
+            --tenda-dark: #1A1A1A;
+        }
+
+        * {
+            font-family: 'Cairo', sans-serif;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #f4f4f6;
+            color: #18181b;
+        }
+
+        /* Custom Scrollbar with Tenda Orange */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #e4e4e7;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #FF6600;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #e05500;
+        }
+
+        /* Locked Tenda Branding Elements (Unselectable & Tamper-Resistant) */
+        .tenda-locked-brand {
+            user-select: none !important;
+            -webkit-user-select: none !important;
+            -moz-user-select: none !important;
+            pointer-events: none;
+        }
+
+        /* Blueprint Canvas Container */
+        .blueprint-wrapper {
+            background: radial-gradient(circle at center, #0e1e38 0%, #071020 100%);
+            border: 2px solid #FF6600;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(255, 102, 0, 0.2);
+            overflow: hidden;
+            position: relative;
+        }
+
+        canvas#floorCanvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            cursor: grab;
+            touch-action: none;
+        }
+        canvas#floorCanvas:active {
+            cursor: grabbing;
+        }
+
+        /* Editable Fields for Client Parameters */
+        .editable-field {
+            background: #fffaf5;
+            border: 1px dashed #fdba74;
+            border-radius: 6px;
+            padding: 3px 8px;
+            transition: all 0.2s;
+        }
+        .editable-field:hover, .editable-field:focus {
+            border-color: #FF6600;
+            border-style: solid;
+            background: #ffffff;
+            box-shadow: 0 0 0 2px rgba(255, 102, 0, 0.15);
+            outline: none;
+        }
+
+        /* Report Watermark — sits inside the report sheet so it survives A4 preview,
+           native print AND html2canvas/html2pdf export (which ignore @media print) */
+        .print-watermark {
+            display: none;
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.05;
+            transform: rotate(-28deg);
+        }
+        .report-sheet > *:not(.print-watermark) {
+            position: relative;
+            z-index: 1;
+        }
+        body.a4-print-mode .print-watermark {
+            display: flex !important;
+        }
+
+        /* Print Text Mirror (Hidden in normal edit mode, shown in Print / PDF / A4 Preview mode) */
+        .print-text-mirror {
+            display: none;
+        }
+
+        /* Compact storage results block — only meaningful in the printed report */
+        .print-only {
+            display: none;
+        }
+        body.a4-print-mode .print-only {
+            display: block !important;
+        }
+
+        /* Active A4 Print Preview / PDF Export Mode on Screen */
+        body.a4-print-mode {
+            background-color: #27272a !important;
+        }
+        body.a4-print-mode .no-print {
+            display: none !important;
+        }
+        body.a4-print-mode .a4-preview-toolbar {
+            display: flex !important;
+        }
+        body.a4-print-mode .report-sheet {
+            max-width: 210mm !important;
+            width: 210mm !important;
+            margin: 16px auto !important;
+            padding: 10mm 12mm !important;
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5) !important;
+            background: #ffffff !important;
+        }
+        body.a4-print-mode .editable-field {
+            display: none !important;
+        }
+        body.a4-print-mode .print-text-mirror {
+            display: inline-block !important;
+        }
+        body.a4-print-mode canvas#floorCanvas {
+            display: none !important;
+        }
+        body.a4-print-mode #floorPlanPrintImg {
+            display: block !important;
+            width: 100% !important;
+            height: auto !important;
+        }
+        body.a4-print-mode .hide-in-print-if-unchecked.print-hidden {
+            display: none !important;
+        }
+
+        /* Mode when generating clean PDF buffer via html2pdf */
+        body.pdf-exporting-mode .a4-preview-toolbar {
+            display: none !important;
+        }
+        body.pdf-exporting-mode .report-sheet {
+            margin: 0 auto !important;
+            box-shadow: none !important;
+            width: 194mm !important;
+            max-width: 194mm !important;
+            padding: 4mm !important;
+        }
+
+        /* Print Styles to replicate the exact engineering PDF report with Tenda Branding */
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 8mm;
+            }
+            body {
+                background: #ffffff !important;
+                color: #000000 !important;
+                font-size: 12px;
+            }
+            .no-print, .a4-preview-toolbar {
+                display: none !important;
+            }
+            .print-only {
+                display: block !important;
+            }
+            .report-sheet {
+                box-shadow: none !important;
+                border: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                max-width: 100% !important;
+                width: 100% !important;
+            }
+            .editable-field {
+                display: none !important;
+            }
+            .print-text-mirror {
+                display: inline-block !important;
+            }
+            canvas#floorCanvas {
+                display: none !important;
+            }
+            #floorPlanPrintImg {
+                display: block !important;
+                width: 100% !important;
+                height: auto !important;
+            }
+            .blueprint-wrapper {
+                box-shadow: none !important;
+                border: 2px solid #FF5500 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            table, th, td, .tenda-print-color {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .hide-in-print-if-unchecked.print-hidden {
+                display: none !important;
+            }
+            .print-watermark {
+                display: flex !important;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-12" oncontextmenu="return handleContextMenu(event)">
+
+    <!-- Sticky Floating Toolbar Shown Only During A4 Print Preview Mode -->
+    <div id="a4PreviewToolbar" class="a4-preview-toolbar hidden sticky top-0 z-50 bg-[#141414] text-white px-4 py-3 border-b-2 border-[#FF5500] shadow-2xl items-center justify-between flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+            <span class="px-3 py-1 rounded-full bg-[#FF5500] text-white text-xs font-black">وضع معاينة التقرير الرسمي (A4)</span>
+            <span class="text-xs text-zinc-300">هذا هو الشكل النهائي للتقرير بدون إطارات التعديل أو أزرار التحكم</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <button type="button" onclick="downloadReportPDF()" id="btnDownloadPdfPreview" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm shadow flex items-center gap-2 transition">
+                <i class="fa-solid fa-file-pdf"></i>
+                <span>حفظ وتحميل ملف PDF مباشر</span>
+            </button>
+            <button type="button" onclick="openStandalonePrintWindow()" class="px-4 py-2 rounded-lg bg-[#FF5500] hover:bg-[#e04b00] text-white font-bold text-xs sm:text-sm shadow flex items-center gap-2 transition">
+                <i class="fa-solid fa-print"></i>
+                <span>إرسال للطابعة الآن</span>
+            </button>
+            <button type="button" onclick="exitA4PreviewMode()" class="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white font-bold text-xs sm:text-sm flex items-center gap-2 transition">
+                <i class="fa-solid fa-pen-to-square"></i>
+                <span>العودة لوضع التعديل</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Reusable Official Tenda Vector Logo Definition (100% Exact Match to Uploaded Image) -->
+    <svg width="0" height="0" class="hidden" aria-hidden="true">
+        <defs>
+            <g id="tenda-official-logo">
+                <!-- Slanted Bold Geometric Wordmark "Tenda" matching official image_26e296.png -->
+                <g transform="translate(28, 0) skewX(-16.5)">
+                    <!-- Iconic Tenda 'T' with flat left bar and long tapered right wedge wing over 'e' -->
+                    <path d="M-18 18 H136 L62 34 H50 V96 H16 V34 H-18 Z" fill="#FF5500" />
+                    <!-- Lowercase 'e' tucked under the T wedge -->
+                    <path fill-rule="evenodd" clip-rule="evenodd" d="M126 30 C96 30 78 45 78 64 C78 85 96 98 128 98 C152 98 168 91 176 81 L155 72 C148 79 139 83 128 83 C112 83 104 76 103 68 H176 C177 65 177 62 177 59 C177 41 158 30 126 30 Z M104 55 C106 46 114 43 126 43 C139 43 147 47 148 55 H104 Z" fill="#FF5500" />
+                    <!-- Lowercase 'n' -->
+                    <path d="M188 32 H217 V42 C226 33 239 30 254 30 C276 30 288 41 288 60 V96 H258 V63 C258 51 251 46 239 46 C227 46 218 52 218 64 V96 H188 V32 Z" fill="#FF5500" />
+                    <!-- Lowercase 'd' with tall ascender rising above T -->
+                    <path fill-rule="evenodd" clip-rule="evenodd" d="M372 2 H402 V96 H373 V87 C365 95 353 98 339 98 C312 98 296 83 296 64 C296 45 312 30 339 30 C352 30 364 34 372 41 V2 Z M349 46 C334 46 325 53 325 64 C325 75 334 82 349 82 C363 82 372 75 372 64 C372 53 363 46 349 46 Z" fill="#FF5500" />
+                    <!-- Lowercase 'a' -->
+                    <path fill-rule="evenodd" clip-rule="evenodd" d="M486 32 H515 V96 H486 V87 C478 95 466 98 452 98 C425 98 409 83 409 64 C409 45 425 30 452 30 C466 30 478 34 486 41 V32 Z M462 46 C447 46 438 53 438 64 C438 75 447 82 462 82 C476 82 485 75 485 64 C485 53 476 46 462 46 Z" fill="#FF5500" />
+                </g>
+                <!-- Official Upright Tagline: "All for better networking." -->
+                <text x="262" y="137" fill="#FF5500" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif" font-size="37.5" font-weight="400" text-anchor="middle" textLength="516" lengthAdjust="spacing">All for better networking.</text>
+            </g>
+        </defs>
+    </svg>
+
+    <!-- Top Application Navbar (Hidden on Print) -->
+    <header class="no-print sticky top-0 z-50 bg-[#141414] text-white shadow-xl border-b-2 border-[#FF5500]">
+        <div class="max-w-7xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+            <!-- Locked Official Tenda Brand Identity -->
+            <div class="flex items-center gap-3">
+                <div class="tenda-locked-brand bg-white px-3 py-1.5 rounded-lg flex items-center select-none shadow-sm" oncontextmenu="return false">
+                    <svg width="145" height="40" viewBox="0 0 525 145" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <use href="#tenda-official-logo" />
+                    </svg>
+                </div>
+                <div class="hidden sm:block h-7 w-[1px] bg-zinc-700"></div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-bold text-sm sm:text-base tracking-wide text-white">Tenda Smart Planner PRO v1.0</h1>
+                    </div>
+                    <p class="text-[11px] text-zinc-400">مخطط وحاسبة أنظمة كاميرات المراقبة</p>
+                </div>
+            </div>
+
+            <!-- Navigation & Client Guide & Print Actions -->
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button" onclick="openGuideModal()" class="px-3 py-1.5 rounded-lg bg-[#FF5A00]/15 hover:bg-[#FF5A00]/25 text-[#FF5A00] border border-[#FF5A00]/40 text-xs sm:text-sm font-bold transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-circle-question"></i>
+                    <span>دليل استخدام العميل</span>
+                </button>
+                <a href="#section-plan" class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-200 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-compass-drafting text-[#FF5A00]"></i>
+                    <span>المخطط الهندسي</span>
+                </a>
+                <a href="#section-storage" class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-200 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-hard-drive text-emerald-400"></i>
+                    <span>حاسبة المساحة</span>
+                </a>
+                <a href="#section-boq" class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-200 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-file-invoice-dollar text-amber-400"></i>
+                    <span>المقايسة والأسعار</span>
+                </a>
+                <button type="button" onclick="enterA4PreviewMode()" class="px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-white font-bold text-xs sm:text-sm transition flex items-center gap-1.5" title="معاينة شكل التقرير النهائي قبل الطباعة">
+                    <i class="fa-solid fa-eye text-amber-400"></i>
+                    <span>معاينة التقرير A4</span>
+                </button>
+                <button type="button" onclick="downloadReportPDF()" id="btnDownloadPdfTop" class="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm shadow-md transition flex items-center gap-1.5" title="تحميل التقرير مباشرة كملف PDF">
+                    <i class="fa-solid fa-file-pdf"></i>
+                    <span>تحميل PDF</span>
+                </button>
+                <button type="button" onclick="triggerSmartPrint()" class="px-4 py-2 rounded-lg bg-gradient-to-r from-[#FF5A00] to-[#e04f00] hover:from-[#ff7024] hover:to-[#FF5A00] text-white font-bold text-xs sm:text-sm shadow-md transition flex items-center gap-2">
+                    <i class="fa-solid fa-print"></i>
+                    <span>طباعة التقرير</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Toast Notification -->
+    <div id="toastMsg" class="no-print fixed bottom-5 left-5 z-50 hidden bg-zinc-900 text-white px-4 py-3 rounded-xl shadow-2xl border-2 border-[#FF6600] flex items-center gap-3 transition-all">
+        <i class="fa-solid fa-shield-halved text-[#FF6600] text-lg"></i>
+        <span id="toastText" class="text-sm font-medium">تم التحديث بنجاح</span>
+    </div>
+
+    <!-- Client Usage Guide Modal (دليل الاستخدام للعميل) -->
+    <div id="clientGuideModal" class="no-print fixed inset-0 z-50 hidden bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border-t-4 border-[#FF6600] p-6">
+            <div class="flex items-center justify-between border-b border-zinc-200 pb-4 mb-5">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-[#FF6600]/10 text-[#FF6600] flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-book-open-reader"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-black text-zinc-900">دليل استخدام برنامج Tenda Smart Planner PRO v1.0 للعميل</h3>
+                        <p class="text-xs text-zinc-500">خطوات تعديل بيانات المشروع واستخراج عرض السعر والمخطط الهندسي</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeGuideModal()" class="w-8 h-8 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-600 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 text-sm text-zinc-700 leading-relaxed">
+                <div class="bg-orange-50 border border-orange-200 rounded-xl p-4">
+                    <div class="font-black text-[#FF5A00] mb-1 flex items-center gap-2">
+                        <i class="fa-solid fa-lock"></i>
+                        <span>هوية وحقوق Tenda ثابتة ومحمية:</span>
+                    </div>
+                    <p class="text-xs text-zinc-700">
+                        هذا البرنامج مخصص لمنتجات وحلول <strong>Tenda</strong>؛ الشعار الرسمي والعلامة المائية داخل المخطط الهندسي وفي خلفية صفحة التقرير وحقوق النشر والاقتباس في أسفل التقرير مقفلة تماماً بحيث تظل ثابتة في جميع التقارير المطبوعة وملفات الـ PDF.
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="p-4 rounded-xl bg-zinc-50 border border-zinc-200">
+                        <div class="font-extrabold text-zinc-900 mb-1.5 flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-[#FF6600] text-white text-xs flex items-center justify-center font-black">1</span>
+                            <span>تعديل بيانات المشروع والعميل</span>
+                        </div>
+                        <p class="text-xs text-zinc-600">
+                            اضغط مباشرة على أي حقل محاط بإطار برتقالي منقط في أعلى التقرير لكتابة (اسم المشروع، اسم العميل/الشركة، التاريخ، واسم المهندس أو الموزع ورقم هاتفه).
+                        </p>
+                    </div>
+
+                    <div class="p-4 rounded-xl bg-zinc-50 border border-zinc-200">
+                        <div class="font-extrabold text-zinc-900 mb-1.5 flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-[#FF6600] text-white text-xs flex items-center justify-center font-black">2</span>
+                            <span>تحريك الكاميرات والغرف على المخطط</span>
+                        </div>
+                        <p class="text-xs text-zinc-600">
+                            اسحب أي كاميرا أو غرفة بالماوس أو باللمس، أو انقر عليها لتغيير دقتها (1M ~ 10M) وزاوية واتجاه الرؤية، وسيقوم البرنامج بحساب <strong>نسبة التغطية %</strong> فوراً.
+                        </p>
+                    </div>
+
+                    <div class="p-4 rounded-xl bg-zinc-50 border border-zinc-200">
+                        <div class="font-extrabold text-zinc-900 mb-1.5 flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-[#FF6600] text-white text-xs flex items-center justify-center font-black">3</span>
+                            <span>حاسبة المساحة ومدة التسجيل (1M ~ 10M)</span>
+                        </div>
+                        <p class="text-xs text-zinc-600">
+                            اختر دقة الكاميرا (من 1 ميجا حتى 10 ميجا) وعدد الأيام لمعرفة مساحة الهارد المطلوبة، أو اختر التبويب الثاني وأدخل مساحة الهارد المتوفرة لديك لتعرف <strong>كم يوماً وكم ساعة</strong> يسجلها النظام. عند تفعيل <strong>"احتساب المساحة على دقة كل كاميرا فعليًا من المخطط"</strong> تستخدم الحاسبة دقة كل كاميرا مرسومة على المخطط (بدقات مختلفة) بدل الدقة الموحدة.
+                        </p>
+                    </div>
+
+                    <div class="p-4 rounded-xl bg-zinc-50 border border-zinc-200">
+                        <div class="font-extrabold text-zinc-900 mb-1.5 flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-[#FF5A00] text-white text-xs flex items-center justify-center font-black">4</span>
+                            <span>تعديل قائمة المنتجات والمقايسة والطباعة</span>
+                        </div>
+                        <p class="text-xs text-zinc-600">
+                            أضف منتجات Tenda من القائمة أو اضغط على <strong>"تعديل قائمة المنتجات"</strong> لتحديث الأصناف والأسعار الافتراضية، ثم اضغط على <strong>"طباعة التقرير / PDF"</strong>.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-zinc-200 flex justify-end">
+                <button type="button" onclick="closeGuideModal()" class="px-6 py-2 rounded-xl bg-[#FF5A00] hover:bg-[#e04f00] text-white font-bold text-sm shadow">
+                    إغلاق والبدء الآن
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Catalog Editor Modal (نافذة تعديل محتويات قائمة منتجات Tenda المنسدلة) -->
+    <div id="catalogEditorModal" class="no-print fixed inset-0 z-50 hidden bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border-t-4 border-[#FF5500] overflow-hidden">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between border-b border-zinc-200 px-6 py-4 bg-zinc-50">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-[#FF5500]/15 text-[#FF5500] flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-boxes-stacked"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base sm:text-lg font-black text-zinc-900">تعديل قائمة منتجات Tenda (+ اختر منتج Tenda لإضافته للمقايسة...)</h3>
+                        <p class="text-xs text-zinc-500">يمكنك تعديل اسم المنتج أو التصنيف أو السعر الافتراضي، أو إضافة موديلات جديدة وحفظها</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeCatalogModal()" class="w-8 h-8 rounded-lg bg-zinc-200 hover:bg-zinc-300 text-zinc-700 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-6 overflow-y-auto space-y-4 flex-1">
+                <!-- Add New Product Form -->
+                <div class="bg-orange-50/70 border border-orange-200 rounded-xl p-4">
+                    <h4 class="text-xs font-black text-[#FF5500] mb-2.5 flex items-center gap-1.5">
+                        <i class="fa-solid fa-plus-circle"></i>
+                        <span>إضافة منتج Tenda جديد إلى القائمة المنسدلة:</span>
+                    </h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+                        <div class="sm:col-span-5">
+                            <label class="block text-[11px] font-bold text-zinc-600 mb-1">اسم وموديل المنتج:</label>
+                            <input type="text" id="newCatName" placeholder="مثال: كاميرا Tenda RP7 (4MP Pan/Tilt)" class="w-full bg-white border border-zinc-300 rounded-lg px-3 py-1.5 text-xs font-bold text-zinc-900 focus:border-[#FF5500] outline-none" />
+                        </div>
+                        <div class="sm:col-span-3">
+                            <label class="block text-[11px] font-bold text-zinc-600 mb-1">التصنيف:</label>
+                            <input type="text" id="newCatCategory" value="كاميرات Tenda" placeholder="مثال: كاميرات Tenda" class="w-full bg-white border border-zinc-300 rounded-lg px-3 py-1.5 text-xs font-semibold text-zinc-700 focus:border-[#FF5500] outline-none" />
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-[11px] font-bold text-zinc-600 mb-1">السعر الافتراضي (ج.م):</label>
+                            <input type="number" id="newCatPrice" value="1000" min="0" class="w-full bg-white border border-zinc-300 rounded-lg px-3 py-1.5 text-xs font-bold text-zinc-900 text-center focus:border-[#FF5500] outline-none" />
+                        </div>
+                        <div class="sm:col-span-2">
+                            <button type="button" onclick="addNewProductToCatalog()" class="w-full py-1.5 px-3 rounded-lg bg-[#FF5500] hover:bg-[#e04b00] text-white font-bold text-xs shadow transition flex items-center justify-center gap-1">
+                                <i class="fa-solid fa-plus"></i>
+                                <span>إضافة للقائمة</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Existing Catalog Table -->
+                <div class="overflow-x-auto rounded-xl border border-zinc-200">
+                    <table class="w-full text-right text-xs">
+                        <thead class="bg-zinc-900 text-white">
+                            <tr>
+                                <th class="py-2.5 px-3">#</th>
+                                <th class="py-2.5 px-3">اسم المنتج (الظاهر في القائمة المنسدلة)</th>
+                                <th class="py-2.5 px-3 text-center w-40">التصنيف</th>
+                                <th class="py-2.5 px-3 text-center w-28">الكمية الافتراضية</th>
+                                <th class="py-2.5 px-3 text-center w-32">السعر (ج.م)</th>
+                                <th class="py-2.5 px-3 text-center w-16">حذف</th>
+                            </tr>
+                        </thead>
+                        <tbody id="catalogEditorTableBody" class="divide-y divide-zinc-200 bg-white">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Developer / Permanent Code Export Tip -->
+                <div class="bg-zinc-100 border border-zinc-300 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div class="text-zinc-700">
+                        <i class="fa-solid fa-code text-[#FF5500] ml-1"></i>
+                        <strong>تثبيت التعديلات:</strong> يتم حفظ تعديلاتك تلقائياً على جهازك، كما يمكنك نسخ كود القائمة للصقه داخل ملف <code class="bg-zinc-200 px-1.5 py-0.5 rounded font-mono">index.html</code> قبل إرساله للعملاء.
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="copyCatalogCodeToClipboard()" class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs flex items-center gap-1.5">
+                            <i class="fa-solid fa-copy"></i>
+                            <span>نسخ كود القائمة للملف</span>
+                        </button>
+                        <button type="button" onclick="resetCatalogToDefaults()" class="px-3 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-xs">
+                            استعادة الافتراضي
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="border-t border-zinc-200 px-6 py-3.5 bg-zinc-50 flex items-center justify-between">
+                <span class="text-xs text-emerald-700 font-bold flex items-center gap-1.5">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>أي تعديل هنا يظهر فوراً في قائمة "+ اختر منتج Tenda لإضافته للمقايسة..."</span>
+                </span>
+                <button type="button" onclick="closeCatalogModal()" class="px-6 py-2 rounded-xl bg-[#FF5500] hover:bg-[#e04b00] text-white font-bold text-xs sm:text-sm shadow">
+                    حفظ وإغلاق
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Report Container -->
+    <main class="max-w-6xl mx-auto mt-6 px-3 sm:px-6">
+        <div id="printableReportContainer" class="report-sheet bg-white rounded-2xl shadow-xl border border-zinc-200 p-5 sm:p-8 relative overflow-hidden">
+
+            <!-- Report Watermark (Protected) — inside the sheet so the PDF export keeps it -->
+            <div class="print-watermark tenda-locked-brand">
+                <svg width="520" height="145" viewBox="0 0 525 145" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <use href="#tenda-official-logo" />
+                </svg>
+            </div>
+
+            <!-- Top Browser/Print Timestamp & Locked Header Bar -->
+            <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-500 pb-3 mb-4 border-b border-zinc-200">
+                <div class="tenda-locked-brand font-bold text-zinc-700">
+                    <span>مخطط وحاسبة أنظمة كاميرات المراقبة | Tenda Smart Planner PRO v1.0</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="no-print text-[10px] bg-orange-50 text-[#FF5A00] border border-orange-200 px-2 py-0.5 rounded font-bold">
+                        <i class="fa-solid fa-pen-to-square ml-1"></i>الحقول ذات الإطار البرتقالي قابلة للتعديل بواسطة العميل
+                    </span>
+                    <span id="liveTimestamp" dir="ltr" class="font-semibold">—</span>
+                </div>
+            </div>
+
+            <!-- 1. REPORT HEADER (Locked Tenda Official Logo + Editable Client Metadata) -->
+            <section class="border-b-2 border-[#1A1A1A] pb-5 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                    
+                    <!-- Right Column in RTL: Editable Project & Client Details (7 Cols) -->
+                    <div class="order-2 md:order-1 md:col-span-7 space-y-2">
+                        <div class="flex flex-wrap items-center gap-2 text-sm font-bold text-zinc-700">
+                            <span>التاريخ:</span>
+                            <input type="text" id="reportDate" value="٢٠٢٦/١٠/٣١" oninput="syncPrintMirrors()" class="editable-field font-bold text-zinc-900 w-36" title="يمكنك تعديل التاريخ" />
+                            <span id="mirror_reportDate" class="print-text-mirror font-bold text-zinc-900">٢٠٢٦/١٠/٣١</span>
+                        </div>
+
+                        <div>
+                            <label class="no-print block text-[10px] text-zinc-400 font-bold mb-0.5">اسم المشروع (قابل للتعديل):</label>
+                            <input type="text" id="projectName" value="المشروع: تأمين المقر الإداري والمخازن" oninput="syncPrintMirrors()" class="editable-field text-lg sm:text-xl font-extrabold text-zinc-900 w-full" />
+                            <div id="mirror_projectName" class="print-text-mirror text-lg sm:text-xl font-extrabold text-zinc-900">المشروع: تأمين المقر الإداري والمخازن</div>
+                        </div>
+
+                        <div>
+                            <label class="no-print block text-[10px] text-zinc-400 font-bold mb-0.5">اسم العميل / الجهة والمنطقة (قابل للتعديل):</label>
+                            <input type="text" id="clientName" value="السادة / شركة النور للتجارة والتوكيلات (المنطقة الصناعية - التجمع الخامس)" oninput="syncPrintMirrors()" class="editable-field text-xs sm:text-sm font-semibold text-zinc-700 w-full" />
+                            <div id="mirror_clientName" class="print-text-mirror text-xs sm:text-sm font-semibold text-zinc-700">السادة / شركة النور للتجارة والتوكيلات (المنطقة الصناعية - التجمع الخامس)</div>
+                        </div>
+                    </div>
+
+                    <!-- Left Column in RTL: PERMANENT LOCKED TENDA OFFICIAL LOGO + Editable Engineer & Warranty (5 Cols) -->
+                    <div class="order-1 md:order-2 md:col-span-5 flex flex-col md:items-end justify-between text-left space-y-2">
+                        <div class="tenda-locked-brand flex flex-col md:items-end w-full">
+                            <svg width="220" height="62" viewBox="0 0 525 145" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <use href="#tenda-official-logo" />
+                            </svg>
+                        </div>
+
+                        <div class="w-full">
+                            <label class="no-print block text-[10px] text-zinc-400 font-bold mb-0.5 md:text-left">بيانات المهندس / المسؤول ورقم الهاتف والعنوان:</label>
+                            <input type="text" id="engineerInfo" value="ENG.Mahmoud Esmail | تليفون: 01001234567 | القاهرة - مدينة نصر - شارع الطيران" oninput="syncPrintMirrors()" class="editable-field text-xs font-bold text-zinc-800 w-full md:text-left" />
+                            <div id="mirror_engineerInfo" class="print-text-mirror text-xs font-bold text-zinc-800 w-full md:text-left">ENG.Mahmoud Esmail | تليفون: 01001234567 | القاهرة - مدينة نصر - شارع الطيران</div>
+                        </div>
+
+                        <div class="w-full">
+                            <label class="no-print block text-[10px] text-zinc-400 font-bold mb-0.5 md:text-left">شروط الضمان:</label>
+                            <input type="text" id="warrantyInfo" value="ضمان شامل لمدة عامين ضد عيوب الصناعة" oninput="syncPrintMirrors()" class="editable-field text-xs font-bold text-emerald-700 w-full md:text-left" />
+                            <div id="mirror_warrantyInfo" class="print-text-mirror text-xs font-bold text-emerald-700 w-full md:text-left">ضمان شامل لمدة عامين ضد عيوب الصناعة</div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- 2. ENGINEERING FLOOR PLAN SECTION -->
+            <section id="section-plan" class="mb-8">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <div>
+                        <h2 class="text-base sm:text-lg font-extrabold text-zinc-900 flex items-center gap-2">
+                            <span class="w-2.5 h-5 rounded-sm bg-[#FF6600] inline-block tenda-print-color"></span>
+                            <span>المخطط الهندسي لتوزيع الكاميرات:</span>
+                        </h2>
+                        <div class="flex items-center gap-2 text-xs sm:text-sm font-bold text-zinc-700 mt-0.5">
+                            <input type="text" id="floorTitleInput" value="الدور الأرضي" oninput="syncPrintMirrors()" class="editable-field font-bold text-zinc-800 w-28" />
+                            <span id="mirror_floorTitleInput" class="print-text-mirror font-bold text-zinc-800">الدور الأرضي</span>
+                            <span>—</span>
+                            <span id="headerCamCount" class="text-[#FF6600] font-extrabold">10 كاميرا</span>
+                            <span>—</span>
+                            <span>نسبة التغطية: <strong id="headerCoveragePct" class="text-emerald-600 font-black">83%</strong></span>
+                            <span class="text-[10px] text-zinc-400">(<span id="headerCoveredArea" dir="ltr">—</span> من <span id="headerFloorArea" dir="ltr">—</span> — مقياس الرسم <span dir="ltr">40 px/m</span>)</span>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Canvas Controls (Hidden on Print) -->
+                    <div class="no-print flex flex-wrap items-center gap-2">
+                        <button type="button" onclick="addCamera()" class="px-3 py-1.5 rounded-lg bg-[#FF6600] hover:bg-[#e05500] text-white text-xs font-bold shadow flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-plus-circle"></i>
+                            <span>إضافة كاميرا Tenda</span>
+                        </button>
+                        <button type="button" onclick="addRoom()" class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold shadow flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-vector-square"></i>
+                            <span>إضافة غرفة</span>
+                        </button>
+                        <button type="button" onclick="syncCamerasToAll()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow flex items-center gap-1.5 transition" title="تحديث عدد الكاميرات في حاسبة الهارد وجدول المقايسة">
+                            <i class="fa-solid fa-arrows-rotate"></i>
+                            <span>مزامنة العدد مع الحاسبة والمقايسة</span>
+                        </button>
+                        <button type="button" onclick="resetFloorPlan()" class="px-2.5 py-1.5 rounded-lg bg-zinc-200 hover:bg-zinc-300 text-zinc-700 text-xs font-bold transition" title="إعادة ضبط المخطط الافتراضي">
+                            <i class="fa-solid fa-rotate-left"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Selected Element Inspector Bar (Hidden on Print) -->
+                <div id="inspectorBar" class="no-print mb-3 bg-zinc-900 text-white p-3 rounded-xl border border-zinc-700 shadow-md">
+                    <div id="inspectorEmpty" class="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-300">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-hand-pointer text-[#FF5A00]"></i>
+                            <span><strong>التحكم في المخطط الهندسي:</strong> اسحب أي <strong>كاميرا</strong> أو <strong>غرفة</strong> أو <strong>جهاز NVR</strong> لتحريكه؛ اضغط على <strong>كاميرا</strong> لتعديل الدقة وزاوية الرؤية والمدى، وعلى <strong>غرفة</strong> لتعديل الاسم والأبعاد، وعلى <strong>NVR</strong> لتعديل الاسم والقنوات.</span>
+                        </div>
+                        <span class="text-[11px] bg-zinc-800 px-2.5 py-1 rounded-md text-[#FF5A00] border border-zinc-700 font-bold">Tenda Official Watermark</span>
+                    </div>
+
+                    <!-- Camera Inspector -->
+                    <div id="inspectorCamera" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-center text-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-[#FF6600] text-white font-black flex items-center justify-center" id="inspCamNum">1</span>
+                            <input type="text" id="inspCamLabel" class="bg-zinc-800 border border-zinc-600 rounded px-2 py-1 text-white w-full font-bold" placeholder="اسم الكاميرا" oninput="updateSelectedCamera()" />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-zinc-400 mb-0.5">دقة الكاميرا (الميجا):</label>
+                            <select id="inspCamRes" class="bg-zinc-800 border border-zinc-600 rounded px-2 py-1 text-[#FF6600] font-bold w-full" onchange="updateSelectedCamera()">
+                                <option value="1M">1 ميجا (720p)</option>
+                                <option value="2M">2 ميجا (1080p)</option>
+                                <option value="3M">3 ميجا (Tenda CP3/RP3)</option>
+                                <option value="4M">4 ميجا (Tenda IT7/CT6)</option>
+                                <option value="5M" selected>5 ميجا (5MP Super HD)</option>
+                                <option value="6M">6 ميجا (6MP Ultra HD)</option>
+                                <option value="10M">10 ميجا (10MP Ultra HD)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-zinc-400 mb-0.5">اتجاه الكاميرا (<span id="inspCamDirVal">45</span>°):</label>
+                            <input type="range" id="inspCamDir" min="0" max="360" step="5" class="w-full accent-[#FF6600]" oninput="updateSelectedCamera()" />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-zinc-400 mb-0.5">زاوية الرؤية FOV (<span id="inspCamFovVal">85</span>°):</label>
+                            <input type="range" id="inspCamFov" min="35" max="135" step="5" class="w-full accent-[#FF6600]" oninput="updateSelectedCamera()" />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-zinc-400 mb-0.5">مدى التغطية (<span id="inspCamRangeVal">6.5</span> م):</label>
+                            <input type="range" id="inspCamRange" min="80" max="380" step="10" class="w-full accent-[#FF6600]" oninput="updateSelectedCamera()" />
+                        </div>
+                        <div class="flex justify-end gap-2">
+                            <button type="button" onclick="deleteSelectedElement()" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold flex items-center gap-1">
+                                <i class="fa-solid fa-trash-can"></i>
+                                <span>حذف</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Room Inspector -->
+                    <div id="inspectorRoom" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-center text-xs">
+                        <div>
+                            <label class="block text-[10px] text-zinc-400 mb-0.5">اسم الغرفة / المنطقة:</label>
+                            <input type="text" id="inspRoomName" class="bg-zinc-800 border border-zinc-600 rounded px-2 py-1 text-white w-full font-bold" oninput="updateSelectedRoom()" />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-zinc-400 mb-0.5">العرض (<span id="inspRoomWVal">—</span> م):</label>
+                            <input type="range" id="inspRoomW" min="50" max="550" step="5" class="w-full accent-[#FF6600]" oninput="resizeSelectedRoom()" />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-zinc-400 mb-0.5">الطول (<span id="inspRoomHVal">—</span> م):</label>
+                            <input type="range" id="inspRoomH" min="35" max="360" step="5" class="w-full accent-[#FF6600]" oninput="resizeSelectedRoom()" />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-zinc-400 mb-0.5">نص الأبعاد (يُشتق من الحجم):</label>
+                            <input type="text" id="inspRoomDim" class="bg-zinc-800 border border-zinc-600 rounded px-2 py-1 text-orange-300 w-full" placeholder="مثال: 5×4 م" oninput="updateSelectedRoom()" />
+                        </div>
+                        <div class="flex justify-end gap-2">
+                            <button type="button" onclick="deleteSelectedElement()" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold flex items-center gap-1">
+                                <i class="fa-solid fa-trash-can"></i>
+                                <span>حذف الغرفة</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- NVR Inspector -->
+                    <div id="inspectorNvr" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3 items-center text-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded bg-[#FF6600] text-white font-black flex items-center justify-center"><i class="fa-solid fa-server"></i></span>
+                            <input type="text" id="inspNvrLabel" class="bg-zinc-800 border border-zinc-600 rounded px-2 py-1 text-white w-full font-bold" aria-label="اسم جهاز التسجيل" oninput="updateSelectedNvr()" />
+                        </div>
+                        <div class="text-zinc-300">
+                            <span class="text-zinc-400">قنوات الجهاز:</span>
+                            <select id="inspNvrChannels" class="bg-zinc-800 border border-zinc-600 rounded px-2 py-1 text-[#FF6600] font-bold" aria-label="عدد قنوات جهاز التسجيل" onchange="updateSelectedNvr()">
+                                <option value="4">4 قنوات</option>
+                                <option value="8">8 قنوات</option>
+                                <option value="16">16 قناة</option>
+                                <option value="32">32 قناة</option>
+                            </select>
+                        </div>
+                        <div class="text-[11px] text-zinc-400" dir="ltr" id="inspNvrWarn"></div>
+                    </div>
+                </div>
+                <!-- 2D Engineering Blueprint Canvas + High-Res Print Image Mirror -->
+                <div class="blueprint-wrapper">
+                    <canvas id="floorCanvas" width="1000" height="540" role="img" aria-label="المخطط الهندسي لتوزيع كاميرات المراقبة"></canvas>
+                    <img id="floorPlanPrintImg" alt="المخطط الهندسي لتوزيع الكاميرات" class="hidden w-full h-auto" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" />
+                </div>
+            </section>
+
+            <!-- 3. BI-DIRECTIONAL STORAGE CALCULATOR (حاسبة المساحة ومدة التسجيل 1M ~ 10M) -->
+            <section id="section-storage" class="mb-8 hide-in-print-if-unchecked">
+                <div class="bg-gradient-to-br from-[#18181b] via-[#202024] to-[#18181b] text-white rounded-2xl p-5 sm:p-6 shadow-xl border-2 border-[#FF6600]/60 tenda-print-color">
+                    
+                    <!-- Calculator Header -->
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-700 pb-4 mb-5">
+                        <div class="flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-xl bg-[#FF6600]/20 border border-[#FF6600] flex items-center justify-center text-[#FF6600] text-xl font-black">
+                                <i class="fa-solid fa-hard-drive"></i>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h2 class="text-base sm:text-xl font-black text-white">حاسبة المساحة ومدة التسجيل الذكية (1M ~ 10M)</h2>
+                                    <span class="text-[11px] bg-[#FF6600] text-white px-2.5 py-0.5 rounded-full font-bold">Tenda Storage Engine</span>
+                                </div>
+                                <p class="text-xs text-zinc-300 mt-0.5">احسب المساحة المطلوبة للكاميرات (1 إلى 10 ميجا) أو اعرف المساحة المتوفرة لديك تسجل كم يوم</p>
+                            </div>
+                        </div>
+
+                        <!-- Print visibility toggle -->
+                        <label class="no-print flex items-center gap-2 text-xs bg-zinc-800/90 hover:bg-zinc-700 px-3 py-2 rounded-lg border border-zinc-600 cursor-pointer select-none">
+                            <input type="checkbox" id="includeStorageInPrint" checked onchange="toggleStoragePrint()" class="accent-[#FF6600] w-4 h-4 rounded" />
+                            <span>إظهار جدول حساب التخزين في الطباعة</span>
+                        </label>
+                    </div>
+
+                    <!-- Mode Switcher Tabs (Interactive UI - Hidden on Print) -->
+                    <div class="no-print grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 bg-zinc-950/70 p-1.5 rounded-xl border border-zinc-700/80">
+                        <button type="button" id="tabBtnMode1" onclick="switchStorageMode(1)" class="py-2.5 px-4 rounded-lg font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 bg-[#FF6600] text-white shadow-lg">
+                            <i class="fa-solid fa-calculator"></i>
+                            <span>١. حساب المساحة المطلوبة (حسب الميجا وعدد الأيام)</span>
+                        </button>
+                        <button type="button" id="tabBtnMode2" onclick="switchStorageMode(2)" class="py-2.5 px-4 rounded-lg font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 text-zinc-300 hover:text-white hover:bg-zinc-800">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                            <span>٢. عندي مساحة هارد: تسجل كام يوم على (1M ~ 10M)؟</span>
+                        </button>
+                    </div>
+
+                    <!-- Shared Technical Parameters Row (Resolution 1M-10M, Cameras, Compression, FPS, Hours) -->
+                    <div class="no-print bg-zinc-800/70 rounded-xl p-4 border border-zinc-700 mb-6">
+                        <div class="mb-4">
+                            <label class="block text-xs font-bold text-orange-300 mb-2">
+                                <i class="fa-solid fa-camera-retro ml-1"></i>
+                                اختر دقة الكاميرا (Resolution - من 1 ميجا إلى 10 ميجا):
+                            </label>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2" id="resButtonsContainer">
+                                <button type="button" onclick="selectResolution(1)" data-res="1" class="res-btn py-2 px-2.5 rounded-lg border border-zinc-600 bg-zinc-900 hover:bg-zinc-700 text-center transition">
+                                    <div class="font-black text-sm text-white">1 ميجا</div>
+                                    <div class="text-[10px] text-zinc-400">720p HD</div>
+                                </button>
+                                <button type="button" onclick="selectResolution(2)" data-res="2" class="res-btn py-2 px-2.5 rounded-lg border border-zinc-600 bg-zinc-900 hover:bg-zinc-700 text-center transition">
+                                    <div class="font-black text-sm text-white">2 ميجا</div>
+                                    <div class="text-[10px] text-zinc-400">1080p FHD</div>
+                                </button>
+                                <button type="button" onclick="selectResolution(3)" data-res="3" class="res-btn py-2 px-2.5 rounded-lg border border-zinc-600 bg-zinc-900 hover:bg-zinc-700 text-center transition">
+                                    <div class="font-black text-sm text-white">3 ميجا</div>
+                                    <div class="text-[10px] text-zinc-400">2304×1296</div>
+                                </button>
+                                <button type="button" onclick="selectResolution(4)" data-res="4" class="res-btn py-2 px-2.5 rounded-lg border border-zinc-600 bg-zinc-900 hover:bg-zinc-700 text-center transition">
+                                    <div class="font-black text-sm text-white">4 ميجا</div>
+                                    <div class="text-[10px] text-zinc-400">2K QHD</div>
+                                </button>
+                                <button type="button" onclick="selectResolution(5)" data-res="5" class="res-btn py-2 px-2.5 rounded-lg border-2 border-[#FF6600] bg-[#FF6600]/20 text-center transition shadow-md">
+                                    <div class="font-black text-sm text-[#FF6600]">5 ميجا</div>
+                                    <div class="text-[10px] text-orange-200">2560×1944</div>
+                                </button>
+                                <button type="button" onclick="selectResolution(6)" data-res="6" class="res-btn py-2 px-2.5 rounded-lg border border-zinc-600 bg-zinc-900 hover:bg-zinc-700 text-center transition">
+                                    <div class="font-black text-sm text-white">6 ميجا</div>
+                                    <div class="text-[10px] text-zinc-400">3072×2048</div>
+                                </button>
+                                <button type="button" onclick="selectResolution(10)" data-res="10" class="res-btn py-2 px-2.5 rounded-lg border border-zinc-600 bg-zinc-900 hover:bg-zinc-700 text-center transition">
+                                    <div class="font-black text-sm text-white">10 ميجا</div>
+                                    <div class="text-[10px] text-zinc-400">Ultra HD</div>
+                                </button>
+                            </div>
+                            <label class="mt-3 flex items-center gap-2 text-xs text-zinc-200 bg-zinc-900/80 px-3 py-2 rounded-lg border border-zinc-700 cursor-pointer">
+                                <input type="checkbox" id="calcUsePlanMix" checked onchange="runStorageCalculations()" class="accent-[#FF6600] w-4 h-4" />
+                                <span>احتساب المساحة على <strong>دقة كل كاميرا فعليًا من المخطط</strong> (عند الإلغاء تُطبَّق الدقة المختارة أعلاه على كل الكاميرات)</span>
+                            </label>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="text-xs text-zinc-300 font-bold">عدد الكاميرات:</label>
+                                    <button type="button" onclick="pullCamCountFromPlan()" class="text-[10px] text-[#FF6600] hover:underline font-bold">سحب من المخطط</button>
+                                </div>
+                                <input type="number" id="calcCamCount" value="10" min="1" max="500" oninput="runStorageCalculations()" class="w-full bg-zinc-900 border border-zinc-600 rounded-lg px-3 py-2 text-white font-black text-sm focus:border-[#FF6600] outline-none" />
+                            </div>
+
+                            <div>
+                                <label class="block text-xs text-zinc-300 font-bold mb-1">تقنية ضغط الفيديو (Codec):</label>
+                                <select id="calcCodec" onchange="runStorageCalculations()" class="w-full bg-zinc-900 border border-zinc-600 rounded-lg px-3 py-2 text-orange-300 font-bold text-xs sm:text-sm focus:border-[#FF6600] outline-none">
+                                    <option value="H.265+" selected>H.265+ (توفير ذكي 70%)</option>
+                                    <option value="H.265">H.265 (توفير قياسي 50%)</option>
+                                    <option value="H.264+">H.264+ (محسن)</option>
+                                    <option value="H.264">H.264 (تقليدي)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs text-zinc-300 font-bold mb-1">معدل الإطارات (FPS):</label>
+                                <select id="calcFps" onchange="runStorageCalculations()" class="w-full bg-zinc-900 border border-zinc-600 rounded-lg px-3 py-2 text-white font-bold text-xs sm:text-sm focus:border-[#FF6600] outline-none">
+                                    <option value="12">12 إطار/ثانية</option>
+                                    <option value="15">15 إطار/ثانية</option>
+                                    <option value="20" selected>20 إطار/ثانية (قياسي)</option>
+                                    <option value="25">25 إطار/ثانية (Full PAL)</option>
+                                    <option value="30">30 إطار/ثانية (NTSC)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs text-zinc-300 font-bold mb-1">جودة الصورة (Bitrate):</label>
+                                <select id="calcQuality" onchange="runStorageCalculations()" class="w-full bg-zinc-900 border border-zinc-600 rounded-lg px-3 py-2 text-white font-bold text-xs sm:text-sm focus:border-[#FF6600] outline-none">
+                                    <option value="0.75">منخفضة (توفير مساحة)</option>
+                                    <option value="1.0" selected>متوسطة (المعيار القياسي)</option>
+                                    <option value="1.35">عالية الفائقة (High Profile)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs text-zinc-300 font-bold mb-1">ساعات التسجيل يومياً:</label>
+                                <select id="calcHoursPerDay" onchange="runStorageCalculations()" class="w-full bg-zinc-900 border border-zinc-600 rounded-lg px-3 py-2 text-white font-bold text-xs sm:text-sm focus:border-[#FF6600] outline-none">
+                                    <option value="24" selected>24 ساعة (تسجيل مستمر)</option>
+                                    <option value="18">18 ساعة يومياً</option>
+                                    <option value="12">12 ساعة (حركة / دوام)</option>
+                                    <option value="8">8 ساعات (حركة خفيفة)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MODE 1 PANEL: Calculate Required Storage -->
+                    <div id="storageMode1Panel" class="no-print grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+                        <div class="lg:col-span-5 bg-zinc-900/90 rounded-xl p-4 border border-zinc-700 flex flex-col justify-between">
+                            <div>
+                                <h3 class="text-sm font-bold text-[#FF6600] mb-3 flex items-center gap-2">
+                                    <i class="fa-solid fa-calendar-days"></i>
+                                    <span>الوضع الأول: تحديد مدة التسجيل المطلوبة</span>
+                                </h3>
+                                <label class="block text-xs text-zinc-300 mb-2">عدد أيام التسجيل المطلوبة:</label>
+                                <div class="flex items-center gap-2 mb-3">
+                                    <input type="number" id="calcRequiredDays" value="15" min="1" max="365" oninput="runStorageCalculations()" class="w-28 bg-zinc-950 border border-[#FF6600]/60 rounded-lg px-3 py-2 text-white font-black text-lg text-center" />
+                                    <span class="text-sm font-bold text-zinc-300">يوم تسجيل</span>
+                                </div>
+                                <div class="flex flex-wrap gap-1.5 mb-4">
+                                    <button type="button" onclick="setQuickDays(7)" class="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-200 border border-zinc-600">7 أيام</button>
+                                    <button type="button" onclick="setQuickDays(15)" class="px-2.5 py-1 rounded bg-[#FF6600]/30 text-orange-300 text-xs border border-[#FF6600]/50 font-bold">15 يوم</button>
+                                    <button type="button" onclick="setQuickDays(30)" class="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-200 border border-zinc-600">30 يوم (شهر)</button>
+                                    <button type="button" onclick="setQuickDays(60)" class="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-200 border border-zinc-600">60 يوم</button>
+                                    <button type="button" onclick="setQuickDays(90)" class="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-200 border border-zinc-600">90 يوم</button>
+                                </div>
+                            </div>
+
+                            <div class="bg-zinc-950/80 rounded-lg p-3 border border-zinc-800 text-xs space-y-1.5">
+                                <div class="flex justify-between text-zinc-400">
+                                    <span>معدل البت للكاميرا الواحدة (Bitrate):</span>
+                                    <strong id="outSingleBitrate" class="text-orange-300">1311 Kbps</strong>
+                                </div>
+                                <div class="flex justify-between text-zinc-400">
+                                    <span>إجمالي الباندويث المطلوب للـ NVR:</span>
+                                    <strong id="outTotalBandwidth" class="text-emerald-400">13.1 Mbps</strong>
+                                </div>
+                                <div class="flex justify-between text-zinc-400">
+                                    <span>استهلاك الكاميرا الواحدة يومياً:</span>
+                                    <strong id="outSingleDailyGB" class="text-white">13.5 GB / يوم</strong>
+                                </div>
+                                <div class="flex justify-between text-zinc-400">
+                                    <span>استهلاك جميع الكاميرات يومياً:</span>
+                                    <strong id="outAllDailyGB" class="text-amber-300">135 GB / يوم</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="lg:col-span-7 bg-gradient-to-br from-orange-950/40 to-zinc-900 rounded-xl p-5 border border-[#FF6600]/40 flex flex-col justify-between">
+                            <div>
+                                <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                                    <span class="text-xs font-bold uppercase tracking-wider text-orange-300 bg-[#FF6600]/15 px-3 py-1 rounded-full border border-[#FF6600]/30">
+                                        نتيجة حساب المساحة المطلوبة
+                                    </span>
+                                    <span id="mode1SummaryBadge" class="text-xs text-zinc-300 font-semibold">10 كاميرات × 5 ميجا × 15 يوم</span>
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                                    <div class="bg-zinc-950/80 p-4 rounded-xl border border-zinc-700/80 text-center">
+                                        <div class="text-xs text-zinc-400 mb-1">المساحة الصافية المطلوبة للتسجيل</div>
+                                        <div id="outRequiredSpaceTB" class="text-2xl sm:text-3xl font-black text-[#FF6600]" dir="ltr">2.03 TB</div>
+                                        <div id="outRequiredSpaceGB" class="text-xs text-zinc-300 mt-1" dir="ltr">(2,025 GB)</div>
+                                    </div>
+
+                                    <div class="bg-emerald-950/40 p-4 rounded-xl border border-emerald-500/40 text-center">
+                                        <div class="text-xs text-emerald-300 mb-1">الهارد ديسك التجاري المقترح (Surveillance HDD)</div>
+                                        <div id="outRecommendedHDD" class="text-xl sm:text-2xl font-black text-emerald-400">هارد 4 تيرابايت (4TB)</div>
+                                        <div id="outRecommendedHDDNote" class="text-[11px] text-zinc-300 mt-1">المساحة الفعلية بعد الفورمات ~ 3,640 GB</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-zinc-700/80">
+                                <div class="text-xs text-zinc-300">
+                                    <i class="fa-solid fa-circle-info text-[#FF6600] ml-1"></i>
+                                    <span>يكفي الهارد المقترح لتسجيل حتى <strong id="outRecHDDActualDays" class="text-emerald-300 font-bold">26 يوم</strong> بنفس الإعدادات.</span>
+                                </div>
+                                <button type="button" onclick="addRecommendedHddToBoq()" class="px-4 py-2 rounded-lg bg-[#FF6600] hover:bg-[#e05500] text-white font-bold text-xs shadow-lg transition flex items-center gap-2">
+                                    <i class="fa-solid fa-cart-plus"></i>
+                                    <span>إضافة الهارد المقترح لجدول المقايسة</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MODE 2 PANEL: Have Storage -> Calculate Recording Days on 1MP..6MP -->
+                    <div id="storageMode2Panel" class="no-print hidden grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+                        <div class="lg:col-span-5 bg-zinc-900/90 rounded-xl p-4 border border-zinc-700 flex flex-col justify-between">
+                            <div>
+                                <h3 class="text-sm font-bold text-emerald-400 mb-3 flex items-center gap-2">
+                                    <i class="fa-solid fa-hard-drive"></i>
+                                    <span>الوضع الثاني: أدخل المساحة المتوفرة لديك حالياً</span>
+                                </h3>
+
+                                <label class="block text-xs text-zinc-300 mb-1.5">اختر حجم الهارد ديسك:</label>
+                                <div class="grid grid-cols-4 gap-1.5 mb-4">
+                                    <button type="button" onclick="setAvailableStorageGB(500)" class="px-2 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 border border-zinc-600">500 GB</button>
+                                    <button type="button" onclick="setAvailableStorageGB(1000)" class="px-2 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 border border-zinc-600">1 TB</button>
+                                    <button type="button" onclick="setAvailableStorageGB(2000)" class="px-2 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 border border-zinc-600">2 TB</button>
+                                    <button type="button" onclick="setAvailableStorageGB(4000)" class="px-2 py-1.5 rounded bg-emerald-600/30 text-emerald-300 text-xs font-bold border border-emerald-500/50">4 TB</button>
+                                    <button type="button" onclick="setAvailableStorageGB(6000)" class="px-2 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 border border-zinc-600">6 TB</button>
+                                    <button type="button" onclick="setAvailableStorageGB(8000)" class="px-2 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 border border-zinc-600">8 TB</button>
+                                    <button type="button" onclick="setAvailableStorageGB(10000)" class="px-2 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 border border-zinc-600">10 TB</button>
+                                    <button type="button" onclick="setAvailableStorageGB(16000)" class="px-2 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 border border-zinc-600">16 TB</button>
+                                </div>
+
+                                <label class="block text-xs text-zinc-300 mb-1.5">أو أدخل المساحة المتوفرة يدوياً:</label>
+                                <div class="flex items-center gap-2 mb-3">
+                                    <input type="number" id="calcAvailableSpaceVal" value="4" min="0.1" step="0.5" oninput="runStorageCalculations()" class="w-full bg-zinc-950 border border-emerald-500/60 rounded-lg px-3 py-2 text-white font-black text-base text-center" />
+                                    <select id="calcAvailableSpaceUnit" onchange="runStorageCalculations()" class="bg-zinc-950 border border-zinc-600 rounded-lg px-3 py-2 text-emerald-400 font-bold text-sm">
+                                        <option value="TB" selected>تيرابايت (TB)</option>
+                                        <option value="GB">جيجابايت (GB)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <label class="flex items-center gap-2 text-xs text-zinc-300 bg-zinc-950/70 p-2.5 rounded-lg border border-zinc-800 cursor-pointer">
+                                <input type="checkbox" id="calcUseFormattedCap" checked onchange="runStorageCalculations()" class="accent-emerald-400 w-4 h-4 rounded" />
+                                <span>احتساب المساحة الفعلية بعد الفورمات (~91% من حجم الهارد)</span>
+                            </label>
+                        </div>
+
+                        <div class="lg:col-span-7 bg-gradient-to-br from-emerald-950/60 to-zinc-900 rounded-xl p-5 border border-emerald-500/40 flex flex-col justify-between">
+                            <div>
+                                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                    <span class="text-xs font-bold text-emerald-300 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/30">
+                                        مدة التسجيل المتاحة على الدقة المختارة (<span id="outMode2ResLabel">5 ميجا</span>)
+                                    </span>
+                                    <span id="outUsableSpaceBadge" class="text-xs text-zinc-300" dir="ltr">Usable: 3,640 GB</span>
+                                </div>
+
+                                <div class="bg-zinc-950/80 p-5 rounded-xl border border-emerald-500/30 text-center my-2">
+                                    <div class="text-xs text-zinc-400 mb-1">هذه المساحة تكفي لتسجيل (<span id="outMode2CamCount">10</span> كاميرات) لمدة:</div>
+                                    <div id="outMode2DurationBig" class="text-2xl sm:text-4xl font-black text-emerald-400 my-1">
+                                        26 يوم و 23 ساعة
+                                    </div>
+                                    <div id="outMode2TotalHours" class="text-xs text-zinc-300">
+                                        (إجمالي 647 ساعة تسجيل متواصل)
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="text-xs text-zinc-300 flex items-center justify-between pt-2 border-t border-zinc-700/80">
+                                <span><i class="fa-solid fa-table-list text-[#FF6600] ml-1"></i> انظر الجدول بالأسفل لمقارنة نفس المساحة على جميع الدقات (من 1 ميجا إلى 10 ميجا).</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PRINT / PDF ONLY: the calculator's headline results, which live in the
+                         interactive panels above and are otherwise absent from the report -->
+                    <div id="storagePrintSummary" class="print-only mt-6 rounded-xl border border-[#FF6600]/50 bg-zinc-900 p-4 tenda-print-color">
+                        <h3 class="text-sm font-black text-[#FF6600] mb-2">ملخص نتيجة حاسبة التخزين</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs text-zinc-200">
+                            <div class="flex justify-between border-b border-zinc-700/70 py-1"><span>عدد الكاميرات:</span><strong id="pSumCamCount">—</strong></div>
+                            <div class="flex justify-between border-b border-zinc-700/70 py-1"><span>دقة الكاميرات:</span><strong id="pSumResList">—</strong></div>
+                            <div class="flex justify-between border-b border-zinc-700/70 py-1"><span>نوع الضغط / الإطارات / الساعات:</span><strong id="pSumParams">—</strong></div>
+                            <div class="flex justify-between border-b border-zinc-700/70 py-1"><span>معدل البت للكاميرا:</span><strong id="pSumBitrate">—</strong></div>
+                            <div class="flex justify-between border-b border-zinc-700/70 py-1"><span>إجمالي الباندويث:</span><strong id="pSumBandwidth">—</strong></div>
+                            <div class="flex justify-between border-b border-zinc-700/70 py-1"><span>استهلاك اليوم لجميع الكاميرات:</span><strong id="pSumDaily">—</strong></div>
+                            <div class="flex justify-between border-b border-zinc-700/70 py-1"><span>المساحة الصافية المطلوبة (<span id="pSumReqDays">—</span> يوم):</span><strong id="pSumRequired">—</strong></div>
+                            <div class="flex justify-between border-b border-zinc-700/70 py-1"><span>الهارد المقترح:</span><strong id="pSumHDD">—</strong></div>
+                            <div class="flex justify-between py-1 sm:col-span-2"><span>مدة التسجيل على المساحة المتوفرة:</span><strong id="pSumRecordDays" class="text-emerald-400">—</strong></div>
+                        </div>
+                    </div>
+
+                    <!-- ALL RESOLUTIONS (1MP to 10MP) LIVE COMPARISON MATRIX TABLE -->
+                    <div class="mt-6">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                            <h3 class="text-xs sm:text-sm font-extrabold text-orange-300 flex items-center gap-2">
+                                <i class="fa-solid fa-layer-group text-[#FF6600]"></i>
+                                <span>جدول المقارنة الشامل لجميع دقات كاميرات المراقبة (1 ميجا ~ 10 ميجا):</span>
+                            </h3>
+                            <span class="text-[11px] text-zinc-400" id="matrixSummarySubtitle">لعدد 10 كاميرات | ضغط H.265+ | 20 إطار/ثانية</span>
+                        </div>
+
+                        <div class="overflow-x-auto rounded-xl border border-zinc-700 bg-zinc-950/80">
+                            <table class="w-full text-right text-xs">
+                                <thead class="bg-zinc-800/90 text-zinc-200 border-b border-zinc-700">
+                                    <tr>
+                                        <th class="py-2.5 px-3">دقة الكاميرا (Resolution)</th>
+                                        <th class="py-2.5 px-3">معدل البت للكاميرا</th>
+                                        <th class="py-2.5 px-3">استهلاك اليوم (<span id="tblCamCountHeader">10</span> كاميرات)</th>
+                                        <th class="py-2.5 px-3 text-orange-300">المساحة المطلوبة لـ (<span id="tblDaysHeader">15</span> يوم)</th>
+                                        <th class="py-2.5 px-3 text-emerald-300">مدة التسجيل على هارد (<span id="tblAvailSpaceHeader">4 TB</span>)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="resComparisonTableBody" class="divide-y divide-zinc-800">
+                                    <!-- One row per SUPPORTED_RESOLUTIONS entry, rebuilt by runStorageCalculations() -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- 4. BILL OF QUANTITIES & QUOTATION TABLE (جدول الكميات والأسعار لمنتجات Tenda) -->
+            <section id="section-boq" class="mb-6">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                    <h2 class="text-base sm:text-lg font-extrabold text-zinc-900 flex items-center gap-2">
+                        <span class="w-2.5 h-5 rounded-sm bg-[#FF5A00] inline-block tenda-print-color"></span>
+                        <span>جدول الكميات والأسعار:</span>
+                    </h2>
+
+                    <!-- Tenda Product Selector & Catalog Editor & Custom Row Buttons (Hidden on Print) -->
+                    <div class="no-print flex flex-wrap items-center gap-2">
+                        <select id="tendaQuickCatalog" class="bg-orange-50 border border-[#FF5A00]/50 rounded-lg px-2.5 py-1.5 text-xs font-bold text-zinc-800 outline-none max-w-xs sm:max-w-sm">
+                            <!-- Populated dynamically from tendaCatalogItems -->
+                        </select>
+                        <button type="button" onclick="addSelectedCatalogProduct()" class="px-3 py-1.5 rounded-lg bg-[#FF6600] hover:bg-[#e05500] text-white text-xs font-bold shadow transition">
+                            إضافة للمقايسة
+                        </button>
+                        <button type="button" onclick="openCatalogModal()" class="px-3 py-1.5 rounded-lg bg-orange-100 hover:bg-orange-200 text-[#FF5500] border border-[#FF5500]/40 text-xs font-extrabold transition flex items-center gap-1.5" title="تعديل أو إضافة منتجات إلى القائمة المنسدلة">
+                            <i class="fa-solid fa-sliders"></i>
+                            <span>تعديل قائمة المنتجات</span>
+                        </button>
+                        <button type="button" onclick="addBoqRow()" class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-bold shadow flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>بند مخصص</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-lg border border-zinc-300">
+                    <table class="w-full text-right border-collapse">
+                        <thead>
+                            <tr class="bg-zinc-900 text-white border-b-2 border-[#FF6600] text-xs sm:text-sm font-extrabold tenda-print-color">
+                                <th class="py-3 px-4 border-l border-zinc-700">البند</th>
+                                <th class="py-3 px-4 border-l border-zinc-700 text-center">التصنيف</th>
+                                <th class="py-3 px-4 border-l border-zinc-700 text-center w-24">الكمية</th>
+                                <th class="py-3 px-4 border-l border-zinc-700 text-center w-32">السعر</th>
+                                <th class="py-3 px-4 text-center w-36">الإجمالي</th>
+                                <th class="no-print py-3 px-2 text-center w-12">حذف</th>
+                            </tr>
+                        </thead>
+                        <tbody id="boqTableBody" class="divide-y divide-zinc-200 text-xs sm:text-sm">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Final Net Total Bar -->
+                <div class="mt-6 pt-4 border-t-2 border-[#1A1A1A] flex items-center justify-between">
+                    <div class="text-lg sm:text-xl font-black text-zinc-900">الصافي النهائي:</div>
+                    <div id="grandTotalDisplay" class="text-xl sm:text-2xl font-black text-[#FF5A00]">13,170 ج.م</div>
+                </div>
+            </section>
+
+            <!-- 5. LOCKED PERMANENT TENDA COPYRIGHT & CITATION FOOTER -->
+            <footer class="tenda-locked-brand mt-8 pt-4 border-t border-zinc-300">
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-3 bg-zinc-50 text-zinc-800 px-4 py-3 rounded-xl border border-zinc-200 border-r-4 border-r-[#FF5500] tenda-print-color">
+                    <div class="flex items-center gap-3">
+                        <svg width="125" height="35" viewBox="0 0 525 145" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <use href="#tenda-official-logo" />
+                        </svg>
+                        <div class="text-[11px] sm:text-xs font-bold text-zinc-700">
+                            مخطط وحاسبة أنظمة كاميرات المراقبة | <span class="text-[#FF5500] font-black">Tenda Smart Planner PRO v1.0</span> — جميع حقوق النشر والاقتباس محفوظة © <span class="text-[#FF5500] font-black">Tenda®</span>
+                        </div>
+                    </div>
+                    <div class="text-[11px] text-[#FF5500] font-bold whitespace-nowrap" dir="ltr">
+                        Tenda® — All for better networking.
+                    </div>
+                </div>
+            </footer>
+
+        </div>
+    </main>
+
+    <script>
+        /********************************************************************
+         * 0. LIGHTWEIGHT BRAND PROTECTION (NO LOOPS, NO OBSERVERS, 0% CPU)
+         ********************************************************************/
+        function handleContextMenu(e) {
+            if (e.target && e.target.closest && e.target.closest('.tenda-locked-brand')) {
+                e.preventDefault();
+                showToast('🔒 شعار وحقوق شركة Tenda ثابتة ومحمية');
+                return false;
+            }
+            return true;
+        }
+
+        function openGuideModal() {
+            document.getElementById('clientGuideModal').classList.remove('hidden');
+        }
+        function closeGuideModal() {
+            document.getElementById('clientGuideModal').classList.add('hidden');
+        }
+
+        /********************************************************************
+         * 0.5 SHARED, LOCALE-STABLE HELPERS
+         *     Every number that reaches the report goes through fmtInt/fmtDec
+         *     so an Arabic-locale browser cannot swap in Arabic-Indic digits
+         *     and break the dir="ltr" fields.
+         ********************************************************************/
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function toNum(value, fallback) {
+            const n = Number(value);
+            return Number.isFinite(n) ? n : fallback;
+        }
+
+        function fmtInt(value) {
+            return Math.round(toNum(value, 0)).toLocaleString('en-US');
+        }
+
+        function fmtDec(value, digits) {
+            // Explicit locale so large figures keep thousands separators and Latin digits
+            // in every browser, exactly like fmtInt.
+            return toNum(value, 0).toLocaleString('en-US', {
+                minimumFractionDigits: digits,
+                maximumFractionDigits: digits
+            });
+        }
+
+        /** Inject text only through textContent / escaped attributes. */
+        function setTextNode(id, text) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.textContent = text;
+            applyBidiDirectionPass(el);
+        }
+
+        const RTL_CHAR = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
+        const LATIN_CHAR = /[A-Za-z0-9\u00C0-\u024F\u0370-\u04FF]/;
+
+        /** First strong direction of a string; the rasteriser needs it per drawn chunk. */
+        function strongDirection(text) {
+            for (const ch of String(text)) {
+                if (RTL_CHAR.test(ch)) return 'rtl';
+                if (LATIN_CHAR.test(ch)) return 'ltr';
+            }
+            return null;
+        }
+
+        const BIDI_MIRROR = { '(': ')', ')': '(', '[': ']', ']': '[', '{': '}', '}': '{' };
+        function mirrorBrackets(text) {
+            return Array.from(text).map(ch => BIDI_MIRROR[ch] || ch).join('');
+        }
+
+        /** Latin with no Arabic or Hebrew anywhere: only these need the LTR embedding. */
+        function isLatinOnlyText(text) {
+            let hasLatin = false;
+            for (const ch of String(text)) {
+                if (RTL_CHAR.test(ch)) return false;
+                if (LATIN_CHAR.test(ch)) hasLatin = true;
+            }
+            return hasLatin;
+        }
+
+        /**
+         * "1,229 Kbps" inside an RTL paragraph is not one run: the digits are EN, the unit
+         * is L, and the space between them resolves to the paragraph direction, so the
+         * browser itself shows "Kbps 1,229". The same rule breaks "1.99 TB (1,982 GB)" and
+         * splits "(6MP 3K+)" across three levels, which flips its brackets. Wrapping the
+         * Latin in an inline LTR embedding makes it a single run in the correct order; an
+         * inline span leaves the block's own alignment untouched, unlike a dir attribute.
+         *
+         * The rest of a mixed Arabic sentence is left exactly as the browser lays it out.
+         */
+        const LATIN_GROUP_IN_RTL = /[([][^()\[\]]*[)\]]/g;
+
+        function bidiFragments(text) {
+            if (isLatinOnlyText(text)) return [{ t: text, ltr: true }];
+            const parts = [];
+            let last = 0;
+            let match;
+            LATIN_GROUP_IN_RTL.lastIndex = 0;
+            while ((match = LATIN_GROUP_IN_RTL.exec(text))) {
+                if (!isLatinOnlyText(match[0])) continue;
+                if (match.index > last) parts.push({ t: text.slice(last, match.index), ltr: false });
+                parts.push({ t: match[0], ltr: true });
+                last = match.index + match[0].length;
+            }
+            if (!parts.length) return null;
+            if (last < text.length) parts.push({ t: text.slice(last), ltr: false });
+            return parts;
+        }
+
+        function applyBidiDirectionPass(root) {
+            if (!root || !root.ownerDocument) return;
+            const ownerDoc = root.ownerDocument;
+            const walker = ownerDoc.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+                acceptNode(node) {
+                    const parent = node.parentElement;
+                    if (!parent || parent.namespaceURI !== 'http://www.w3.org/1999/xhtml') return NodeFilter.FILTER_REJECT;
+                    if (parent.closest('[data-bidi-ltr]')) return NodeFilter.FILTER_REJECT;
+                    const text = node.nodeValue;
+                    if (!text || !/\S/.test(text)) return NodeFilter.FILTER_REJECT;
+                    return bidiFragments(text) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+                }
+            });
+            const targets = [];
+            while (walker.nextNode()) targets.push(walker.currentNode);
+            targets.forEach(node => {
+                if (!node.parentNode) return;
+                const frag = ownerDoc.createDocumentFragment();
+                bidiFragments(node.nodeValue).forEach(part => {
+                    if (!part.ltr) {
+                        frag.appendChild(ownerDoc.createTextNode(part.t));
+                        return;
+                    }
+                    const span = ownerDoc.createElement('span');
+                    span.setAttribute('data-bidi-ltr', '');
+                    span.setAttribute('dir', 'ltr');
+                    span.textContent = part.t;
+                    frag.appendChild(span);
+                });
+                node.parentNode.replaceChild(frag, node);
+            });
+        }
+
+        /**
+         * html2canvas has no bidi engine: it measures a text node chunk by chunk and then
+         * paints every chunk into a canvas whose base direction is LTR, so Arabic words come
+         * out letter-reversed and edge punctuation lands on the wrong side. Two things follow.
+         *
+         * The context direction is set per chunk at draw time, which makes the paint match
+         * what the browser already shows. And a chunk whose measured box spans two bidi runs
+         * gets the union of both as its origin, so the runs overlap — therefore each text
+         * node is split at its bidi run boundaries first, leaving one run per chunk.
+         *
+         * The split only ever happens inside the cloned document the rasterizer reads; the
+         * live sheet keeps the plain strings for the native print engine.
+         */
+        function bidiRunSegments(text, baseDir) {
+            const paragraph = baseDir === 'ltr' ? 'L' : 'R';
+            const chars = Array.from(String(text));
+            const kindOf = ch => (RTL_CHAR.test(ch) ? 'R' : LATIN_CHAR.test(ch) ? 'L' : 'N');
+            const out = [];
+            let current = '';
+            let currentKind = '';
+            let i = 0;
+            while (i < chars.length) {
+                const kind = kindOf(chars[i]);
+                if (kind !== 'N') {
+                    if (currentKind && kind !== currentKind) { out.push(current); current = ''; }
+                    currentKind = kind;
+                    current += chars[i];
+                    i++;
+                    continue;
+                }
+                let j = i;
+                while (j < chars.length && kindOf(chars[j]) === 'N') j++;
+                let neutral = chars.slice(i, j).join('');
+                const nextKind = j < chars.length ? kindOf(chars[j]) : null;
+                // A neutral run keeps the class of the run on both sides; otherwise it
+                // falls back to the paragraph direction, exactly like the bidi algorithm.
+                const resolved = currentKind && nextKind === currentKind ? currentKind : paragraph;
+                if (current && currentKind === resolved) {
+                    current += neutral;
+                } else if (nextKind === resolved) {
+                    if (current) out.push(current);
+                    current = neutral;
+                    currentKind = '';
+                } else {
+                    if (current) out.push(current);
+                    // Drawn on its own, so it gets the rasterizer's RTL base: hand it the
+                    // glyph that mirroring turns into the one the browser shows.
+                    out.push(paragraph === 'L' ? mirrorBrackets(neutral) : neutral);
+                    current = '';
+                    currentKind = '';
+                }
+                i = j;
+            }
+            if (current) out.push(current);
+            return out.filter(run => run !== '');
+        }
+
+        function splitTextNodesByBidiRuns(root) {
+            if (!root || !root.ownerDocument) return 0;
+            const ownerDoc = root.ownerDocument;
+            const view = ownerDoc.defaultView;
+            const baseDirOf = node => {
+                const parent = node.parentElement;
+                if (!parent || !view) return 'rtl';
+                return view.getComputedStyle(parent).direction === 'ltr' ? 'ltr' : 'rtl';
+            };
+            const walker = ownerDoc.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+                acceptNode(node) {
+                    const parent = node.parentElement;
+                    if (!parent || parent.namespaceURI !== 'http://www.w3.org/1999/xhtml') return NodeFilter.FILTER_REJECT;
+                    if (/^(script|style|textarea)$/i.test(parent.tagName)) return NodeFilter.FILTER_REJECT;
+                    return bidiRunSegments(node.nodeValue, baseDirOf(node)).length > 1 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+                }
+            });
+            const targets = [];
+            while (walker.nextNode()) targets.push(walker.currentNode);
+            targets.forEach(node => {
+                if (!node.parentNode) return;
+                const frag = ownerDoc.createDocumentFragment();
+                bidiRunSegments(node.nodeValue, baseDirOf(node)).forEach(run => frag.appendChild(ownerDoc.createTextNode(run)));
+                node.parentNode.replaceChild(frag, node);
+            });
+            return targets.length;
+        }
+
+        let rasterFillText = null;
+
+        function installRasterBidiPatch() {
+            const proto = window.CanvasRenderingContext2D && window.CanvasRenderingContext2D.prototype;
+            if (!proto || !proto.fillText || proto.fillText.__bidiPatch) return;
+            const native = proto.fillText;
+            const patched = function (text, x, y, maxWidth) {
+                const previousDirection = this.direction;
+                const previousAlign = this.textAlign;
+                this.direction = strongDirection(text) || 'rtl';
+                this.textAlign = previousAlign === 'start' ? 'left' : previousAlign === 'end' ? 'right' : previousAlign;
+                try {
+                    return maxWidth === undefined
+                        ? native.call(this, text, x, y)
+                        : native.call(this, text, x, y, maxWidth);
+                } finally {
+                    this.direction = previousDirection;
+                    this.textAlign = previousAlign;
+                }
+            };
+            patched.__bidiPatch = true;
+            rasterFillText = { proto, native };
+            proto.fillText = patched;
+        }
+
+        function uninstallRasterBidiPatch() {
+            if (!rasterFillText) return;
+            rasterFillText.proto.fillText = rasterFillText.native;
+            rasterFillText = null;
+        }
+
+        /********************************************************************
+         * 1. FLOOR PLAN DATA & ULTRA-FAST 2D BLUEPRINT ENGINE (ON-DEMAND)
+         ********************************************************************/
+        const canvas = document.getElementById('floorCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // ONE authoritative drawing scale. Everything metric in the plan (room
+        // sizes, camera range, the scale bar, the coverage maths) is derived
+        // from this so the numbers in the report can actually be reproduced.
+        const PX_PER_METER = 40;
+        const pxToMeters = px => px / PX_PER_METER;
+        const metersToPx = m => m * PX_PER_METER;
+
+        const defaultPlanData = {
+            rooms: [
+                { id: 'r1', name: 'مكتب مدير', dim: '5×4 م', x: 675, y: 12, w: 312, h: 118, isSpecial: false },
+                { id: 'r2', name: 'مكتب اجتماعات', dim: '6×4 م', x: 405, y: 12, w: 264, h: 118, isSpecial: false },
+                { id: 'r3', name: 'محاسب', dim: '5×4 م', x: 162, y: 12, w: 237, h: 118, isSpecial: false },
+                { id: 'r4', name: 'بوفيه', dim: '1.8×2 م', x: 96, y: 12, w: 60, h: 68, isSpecial: false },
+                { id: 'r5', name: 'حمام', dim: '1.8×2 م', x: 14, y: 12, w: 76, h: 68, isSpecial: false },
+                { id: 'r6', name: 'طرقة 2', dim: '14×1.8 م', x: 14, y: 136, w: 718, h: 48, isCorridor: true },
+                { id: 'r7', name: 'مكتب فني', dim: '3.5×4.5 م', x: 738, y: 136, w: 249, h: 185, isSpecial: false },
+                { id: 'r8', name: 'طرقة 1', dim: '5×2.5 م', x: 472, y: 190, w: 260, h: 92, isCorridor: true },
+                { id: 'r9', name: 'أرشيف', dim: '5×1.2 م', x: 472, y: 288, w: 260, h: 33, isSpecial: false },
+                { id: 'r10', name: 'مخزن', dim: '8.5×4.5 م', x: 472, y: 327, w: 515, h: 198, isSpecial: false },
+                { id: 'r11', name: 'طرقة', dim: '8×6.5 م', x: 68, y: 190, w: 396, h: 335, isCorridor: true },
+                { id: 'r12', name: 'ريسبشن', dim: '4.5×1.8 م', x: 238, y: 450, w: 218, h: 75, isSpecial: false },
+                { id: 'r13', name: 'بوفيه', dim: '1.2×2.5 م', x: 14, y: 405, w: 48, h: 85, isSpecial: true }
+            ],
+            cameras: [
+                { id: 'c1', num: 1, label: 'كاميرا داخلية', res: '5M', x: 970, y: 508, dir: 205, fov: 85, range: 280 },
+                { id: 'c2', num: 2, label: 'كاميرا داخلية', res: '5M', x: 488, y: 465, dir: 330, fov: 85, range: 260 },
+                { id: 'c3', num: 3, label: 'كاميرا داخلية', res: '5M', x: 432, y: 512, dir: 190, fov: 75, range: 195 },
+                { id: 'c4', num: 4, label: 'كاميرا داخلية', res: '5M', x: 488, y: 342, dir: 35, fov: 85, range: 240 },
+                { id: 'c5', num: 5, label: 'كاميرا داخلية', res: '5M', x: 715, y: 304, dir: 195, fov: 75, range: 230 },
+                { id: 'c6', num: 6, label: 'كاميرا داخلية', res: '5M', x: 82, y: 208, dir: 50, fov: 85, range: 320 },
+                { id: 'c7', num: 7, label: 'كاميرا داخلية', res: '5M', x: 392, y: 26, dir: 140, fov: 85, range: 250 },
+                { id: 'c8', num: 8, label: 'كاميرا داخلية', res: '5M', x: 26, y: 155, dir: 5, fov: 65, range: 340 },
+                { id: 'c9', num: 9, label: 'كاميرا داخلية', res: '5M', x: 652, y: 26, dir: 135, fov: 85, range: 260 },
+                { id: 'c10', num: 10, label: 'كاميرا داخلية', res: '5M', x: 968, y: 154, dir: 135, fov: 85, range: 230 }
+            ],
+            nvr: { x: 878, y: 482, w: 86, h: 26, label: 'جهاز NVR', channels: 16 }
+        };
+
+        let rooms = JSON.parse(JSON.stringify(defaultPlanData.rooms));
+        let cameras = JSON.parse(JSON.stringify(defaultPlanData.cameras));
+        let nvrBox = JSON.parse(JSON.stringify(defaultPlanData.nvr));
+
+        let selectedElement = null;
+        let isDragging = false;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+
+        // Coverage is measured, not estimated: the plan is sampled on a fixed grid and
+        // each sample is attributed to the room UNION (overlapping rooms are counted
+        // once) and to the first camera cone that actually reaches it. Cone overlap is
+        // therefore never double counted, and the result is real square metres.
+        const COVERAGE_SAMPLE_PX = 10;
+
+        let floorStats = { floorAreaM2: 0, coveredAreaM2: 0, coveragePct: 0 };
+
+        function cameraCoversPoint(cam, px, py) {
+            const dx = px - cam.x;
+            const dy = py - cam.y;
+            if (Math.hypot(dx, dy) > cam.range) return false;
+            let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+            if (angle < 0) angle += 360;
+            const delta = Math.abs(angle - cam.dir) % 360;
+            return Math.min(delta, 360 - delta) <= cam.fov / 2;
+        }
+
+        function pointInAnyRoom(px, py) {
+            for (let i = 0; i < rooms.length; i++) {
+                const r = rooms[i];
+                if (px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h) return true;
+            }
+            return false;
+        }
+
+        function computeFloorStats() {
+            const step = COVERAGE_SAMPLE_PX;
+            const cellAreaM2 = (step / PX_PER_METER) * (step / PX_PER_METER);
+            let floorCells = 0;
+            let coveredCells = 0;
+
+            for (let y = step / 2; y < canvas.height; y += step) {
+                for (let x = step / 2; x < canvas.width; x += step) {
+                    if (!pointInAnyRoom(x, y)) continue;
+                    floorCells++;
+                    for (let i = 0; i < cameras.length; i++) {
+                        if (cameraCoversPoint(cameras[i], x, y)) {
+                            coveredCells++;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            floorStats = {
+                floorAreaM2: floorCells * cellAreaM2,
+                coveredAreaM2: coveredCells * cellAreaM2,
+                coveragePct: floorCells === 0 ? 0 : Math.round((coveredCells / floorCells) * 100)
+            };
+            return floorStats;
+        }
+
+        function computeCoveragePercentage() {
+            return computeFloorStats().coveragePct;
+        }
+
+        function drawFloorPlan() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Dark Blueprint Background
+            ctx.fillStyle = '#081326';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 2. Clean Engineering Grid
+            ctx.strokeStyle = 'rgba(0, 212, 255, 0.05)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let x = 0; x < canvas.width; x += 30) {
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+            }
+            for (let y = 0; y < canvas.height; y += 30) {
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+            }
+            ctx.stroke();
+
+            // 3. Draw Rooms
+            for (let i = 0; i < rooms.length; i++) {
+                const room = rooms[i];
+                const isSelected = selectedElement && selectedElement.type === 'room' && selectedElement.item.id === room.id;
+
+                ctx.save();
+                if (room.isSpecial) {
+                    ctx.fillStyle = 'rgba(20, 83, 45, 0.35)';
+                } else if (room.isCorridor) {
+                    ctx.fillStyle = 'rgba(15, 42, 74, 0.55)';
+                } else {
+                    ctx.fillStyle = 'rgba(12, 36, 66, 0.78)';
+                }
+                ctx.fillRect(room.x, room.y, room.w, room.h);
+
+                ctx.lineWidth = isSelected ? 2.5 : 1.5;
+                if (isSelected) {
+                    ctx.strokeStyle = '#FF6600';
+                    ctx.setLineDash([6, 3]);
+                } else if (room.isCorridor) {
+                    ctx.strokeStyle = '#a855f7';
+                } else if (room.isSpecial) {
+                    ctx.strokeStyle = '#eab308';
+                    ctx.setLineDash([4, 4]);
+                } else {
+                    ctx.strokeStyle = '#00d4ff';
+                }
+                ctx.strokeRect(room.x, room.y, room.w, room.h);
+                ctx.setLineDash([]);
+
+                const centerX = room.x + room.w / 2;
+                const centerY = room.y + room.h / 2;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                ctx.fillStyle = '#e2e8f0';
+                ctx.font = 'bold 12px Cairo, sans-serif';
+                ctx.fillText(room.name, centerX, centerY - 6);
+
+                if (room.dim) {
+                    ctx.fillStyle = '#64748b';
+                    ctx.font = '10px Cairo, sans-serif';
+                    ctx.fillText(room.dim, centerX, centerY + 9);
+                }
+                ctx.restore();
+            }
+
+            // 3.5. Locked Official Tenda Vector Watermark on Canvas
+            ctx.save();
+            ctx.translate(canvas.width / 2 - 90, canvas.height / 2 - 26);
+            ctx.scale(0.35, 0.35);
+            ctx.globalAlpha = 0.12;
+            ctx.fillStyle = '#FF5500';
+            ctx.save();
+            ctx.transform(1, 0, -0.296, 1, 28, 0);
+            const tendaWatermarkPath = new Path2D('M-18 18 H136 L62 34 H50 V96 H16 V34 H-18 Z M126 30 C96 30 78 45 78 64 C78 85 96 98 128 98 C152 98 168 91 176 81 L155 72 C148 79 139 83 128 83 C112 83 104 76 103 68 H176 C177 65 177 62 177 59 C177 41 158 30 126 30 Z M104 55 C106 46 114 43 126 43 C139 43 147 47 148 55 H104 Z M188 32 H217 V42 C226 33 239 30 254 30 C276 30 288 41 288 60 V96 H258 V63 C258 51 251 46 239 46 C227 46 218 52 218 64 V96 H188 V32 Z M372 2 H402 V96 H373 V87 C365 95 353 98 339 98 C312 98 296 83 296 64 C296 45 312 30 339 30 C352 30 364 34 372 41 V2 Z M349 46 C334 46 325 53 325 64 C325 75 334 82 349 82 C363 82 372 75 372 64 C372 53 363 46 349 46 Z M486 32 H515 V96 H486 V87 C478 95 466 98 452 98 C425 98 409 83 409 64 C409 45 425 30 452 30 C466 30 478 34 486 41 V32 Z M462 46 C447 46 438 53 438 64 C438 75 447 82 462 82 C476 82 485 75 485 64 C485 53 476 46 462 46 Z');
+            ctx.fill(tendaWatermarkPath, 'evenodd');
+            ctx.restore();
+            ctx.font = '400 37px "Segoe UI", Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('All for better networking.', 262, 137);
+            ctx.restore();
+
+            // 4. Draw Camera FOV Cones
+            for (let i = 0; i < cameras.length; i++) {
+                const cam = cameras[i];
+                ctx.save();
+                const startAngle = ((cam.dir - cam.fov / 2) * Math.PI) / 180;
+                const endAngle = ((cam.dir + cam.fov / 2) * Math.PI) / 180;
+
+                const coneGrad = ctx.createRadialGradient(cam.x, cam.y, 5, cam.x, cam.y, cam.range);
+                coneGrad.addColorStop(0, 'rgba(0, 240, 255, 0.38)');
+                coneGrad.addColorStop(0.7, 'rgba(0, 200, 235, 0.16)');
+                coneGrad.addColorStop(1, 'rgba(0, 180, 216, 0.02)');
+
+                ctx.beginPath();
+                ctx.moveTo(cam.x, cam.y);
+                ctx.arc(cam.x, cam.y, cam.range, startAngle, endAngle);
+                ctx.closePath();
+                ctx.fillStyle = coneGrad;
+                ctx.fill();
+
+                ctx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([4, 4]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
+            }
+
+            // 5. Draw NVR Box
+            if (nvrBox) {
+                ctx.save();
+                const isNvrSelected = selectedElement && selectedElement.type === 'nvr';
+                ctx.fillStyle = '#1e1b18';
+                ctx.strokeStyle = isNvrSelected ? '#ffffff' : '#FF6600';
+                ctx.lineWidth = 2;
+                ctx.fillRect(nvrBox.x, nvrBox.y, nvrBox.w, nvrBox.h);
+                ctx.strokeRect(nvrBox.x, nvrBox.y, nvrBox.w, nvrBox.h);
+
+                ctx.fillStyle = '#FF6600';
+                ctx.font = 'bold 11px Cairo, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(nvrBox.label, nvrBox.x + nvrBox.w / 2, nvrBox.y + nvrBox.h / 2 - 5);
+
+                // Channel count is shown (and turns red when the plan outgrows the NVR)
+                // so the setting has a visible effect on the printed plan too.
+                const nvrChannels = toNum(nvrBox.channels, 0);
+                ctx.fillStyle = cameras.length > nvrChannels ? '#ff7a7a' : '#ffb066';
+                ctx.font = 'bold 9px Cairo, sans-serif';
+                ctx.fillText(`${cameras.length}/${nvrChannels} قناة`, nvrBox.x + nvrBox.w / 2, nvrBox.y + nvrBox.h / 2 + 7);
+                ctx.restore();
+            }
+
+            // 6. Draw Camera Nodes & Badges
+            for (let idx = 0; idx < cameras.length; idx++) {
+                const cam = cameras[idx];
+                cam.num = idx + 1;
+                const isSelected = selectedElement && selectedElement.type === 'camera' && selectedElement.item.id === cam.id;
+
+                ctx.save();
+                if (isSelected) {
+                    ctx.beginPath();
+                    ctx.arc(cam.x, cam.y, 15, 0, Math.PI * 2);
+                    ctx.strokeStyle = '#FF6600';
+                    ctx.lineWidth = 2.5;
+                    ctx.stroke();
+                }
+
+                ctx.beginPath();
+                ctx.arc(cam.x, cam.y, 10, 0, Math.PI * 2);
+                ctx.fillStyle = isSelected ? '#FF6600' : '#00e5ff';
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#082f49';
+                ctx.stroke();
+
+                ctx.fillStyle = isSelected ? '#ffffff' : '#020617';
+                ctx.font = '900 10px Cairo, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(String(cam.num), cam.x, cam.y + 0.5);
+
+                const fullLabel = `${cam.label} (${cam.res})`;
+                ctx.font = 'bold 9.5px Cairo, sans-serif';
+                const textW = ctx.measureText(fullLabel).width + 10;
+                const badgeX = Math.min(Math.max(cam.x - textW / 2, 4), canvas.width - textW - 4);
+                const badgeY = cam.y + 13;
+
+                ctx.fillStyle = 'rgba(7, 17, 32, 0.85)';
+                ctx.fillRect(badgeX, badgeY, textW, 15);
+                ctx.fillStyle = '#bae6fd';
+                ctx.textAlign = 'center';
+                ctx.fillText(fullLabel, badgeX + textW / 2, badgeY + 7.5);
+                ctx.restore();
+            }
+
+            // 7. Scale Bar — length must match PX_PER_METER so the drawing is measurable
+            ctx.save();
+            const scaleBarMeters = 10;
+            const scaleBarStartX = 22;
+            const scaleBarEndX = scaleBarStartX + metersToPx(scaleBarMeters);
+            ctx.fillStyle = '#FF6600';
+            ctx.beginPath();
+            ctx.arc(scaleBarStartX, 520, 9, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 9px Cairo, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(String(scaleBarMeters), scaleBarStartX, 520);
+
+            ctx.strokeStyle = 'rgba(226, 232, 240, 0.6)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(scaleBarStartX + 9, 520);
+            ctx.lineTo(scaleBarEndX, 520);
+            ctx.stroke();
+            for (let m = 1; m <= scaleBarMeters; m++) {
+                const tickX = scaleBarStartX + 9 + (scaleBarEndX - scaleBarStartX - 9) * (m / scaleBarMeters);
+                ctx.beginPath();
+                ctx.moveTo(tickX, 515);
+                ctx.lineTo(tickX, 525);
+                ctx.stroke();
+            }
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '10px Cairo, sans-serif';
+            ctx.fillText(`${scaleBarMeters} متر — مقياس رسم ${PX_PER_METER} بكسل/متر (Tenda Planner)`, (scaleBarStartX + scaleBarEndX) / 2, 507);
+            ctx.restore();
+
+            updateStatusHeader();
+        }
+
+        function updateStatusHeader() {
+            const stats = computeFloorStats();
+            setTextNode('headerCamCount', `${cameras.length} كاميرا`);
+            setTextNode('headerCoveragePct', `${stats.coveragePct}%`);
+            setTextNode('headerFloorArea', `${fmtDec(stats.floorAreaM2, 1)} م²`);
+            setTextNode('headerCoveredArea', `${fmtDec(stats.coveredAreaM2, 1)} م²`);
+        }
+
+        function getCanvasCoords(evt) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+            const clientY = evt.touches ? evt.touches[0].clientY : evt.clientY;
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function handlePointerDown(evt) {
+            const pos = getCanvasCoords(evt);
+
+            for (let i = cameras.length - 1; i >= 0; i--) {
+                const cam = cameras[i];
+                if (Math.hypot(pos.x - cam.x, pos.y - cam.y) <= 16) {
+                    selectedElement = { type: 'camera', item: cam };
+                    isDragging = true;
+                    dragOffsetX = pos.x - cam.x;
+                    dragOffsetY = pos.y - cam.y;
+                    showInspectorForSelected();
+                    drawFloorPlan();
+                    return;
+                }
+            }
+
+            if (
+                pos.x >= nvrBox.x && pos.x <= nvrBox.x + nvrBox.w &&
+                pos.y >= nvrBox.y && pos.y <= nvrBox.y + nvrBox.h
+            ) {
+                selectedElement = { type: 'nvr', item: nvrBox };
+                isDragging = true;
+                dragOffsetX = pos.x - nvrBox.x;
+                dragOffsetY = pos.y - nvrBox.y;
+                showInspectorForSelected();
+                drawFloorPlan();
+                return;
+            }
+
+            for (let i = rooms.length - 1; i >= 0; i--) {
+                const r = rooms[i];
+                if (pos.x >= r.x && pos.x <= r.x + r.w && pos.y >= r.y && pos.y <= r.y + r.h) {
+                    selectedElement = { type: 'room', item: r };
+                    isDragging = true;
+                    dragOffsetX = pos.x - r.x;
+                    dragOffsetY = pos.y - r.y;
+                    showInspectorForSelected();
+                    drawFloorPlan();
+                    return;
+                }
+            }
+
+            selectedElement = null;
+            showInspectorForSelected();
+            drawFloorPlan();
+        }
+
+        function handlePointerMove(evt) {
+            if (!isDragging || !selectedElement) return;
+            if (evt.cancelable) evt.preventDefault();
+            const pos = getCanvasCoords(evt);
+
+            if (selectedElement.type === 'camera') {
+                selectedElement.item.x = Math.max(15, Math.min(canvas.width - 15, pos.x - dragOffsetX));
+                selectedElement.item.y = Math.max(15, Math.min(canvas.height - 15, pos.y - dragOffsetY));
+            } else if (selectedElement.type === 'nvr') {
+                selectedElement.item.x = Math.max(10, Math.min(canvas.width - selectedElement.item.w - 10, pos.x - dragOffsetX));
+                selectedElement.item.y = Math.max(10, Math.min(canvas.height - selectedElement.item.h - 10, pos.y - dragOffsetY));
+            } else if (selectedElement.type === 'room') {
+                selectedElement.item.x = Math.max(5, Math.min(canvas.width - selectedElement.item.w - 5, pos.x - dragOffsetX));
+                selectedElement.item.y = Math.max(5, Math.min(canvas.height - selectedElement.item.h - 5, pos.y - dragOffsetY));
+            }
+            drawFloorPlan();
+        }
+
+        function handlePointerUp() {
+            isDragging = false;
+        }
+
+        canvas.addEventListener('mousedown', handlePointerDown);
+        canvas.addEventListener('mousemove', handlePointerMove);
+        window.addEventListener('mouseup', handlePointerUp);
+
+        canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+        canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
+        window.addEventListener('touchend', handlePointerUp);
+
+        function showInspectorForSelected() {
+            const emptyEl = document.getElementById('inspectorEmpty');
+            const camEl = document.getElementById('inspectorCamera');
+            const roomEl = document.getElementById('inspectorRoom');
+            const nvrEl = document.getElementById('inspectorNvr');
+
+            emptyEl.classList.add('hidden');
+            camEl.classList.add('hidden');
+            roomEl.classList.add('hidden');
+            nvrEl.classList.add('hidden');
+
+            if (!selectedElement) {
+                emptyEl.classList.remove('hidden');
+                return;
+            }
+
+            if (selectedElement.type === 'camera') {
+                const cam = selectedElement.item;
+                camEl.classList.remove('hidden');
+                setTextNode('inspCamNum', cam.num);
+                document.getElementById('inspCamLabel').value = cam.label;
+                document.getElementById('inspCamRes').value = cam.res;
+                document.getElementById('inspCamDir').value = cam.dir;
+                setTextNode('inspCamDirVal', cam.dir);
+                document.getElementById('inspCamFov').value = cam.fov;
+                setTextNode('inspCamFovVal', cam.fov);
+                document.getElementById('inspCamRange').value = cam.range;
+                setTextNode('inspCamRangeVal', fmtDec(pxToMeters(cam.range), 1));
+            } else if (selectedElement.type === 'room') {
+                const room = selectedElement.item;
+                roomEl.classList.remove('hidden');
+                document.getElementById('inspRoomName').value = room.name;
+                document.getElementById('inspRoomW').value = room.w;
+                document.getElementById('inspRoomH').value = room.h;
+                document.getElementById('inspRoomDim').value = room.dim || '';
+                setTextNode('inspRoomWVal', fmtDec(pxToMeters(room.w), 1));
+                setTextNode('inspRoomHVal', fmtDec(pxToMeters(room.h), 1));
+            } else if (selectedElement.type === 'nvr') {
+                nvrEl.classList.remove('hidden');
+                document.getElementById('inspNvrLabel').value = nvrBox.label;
+                document.getElementById('inspNvrChannels').value = String(nvrBox.channels || 16);
+                refreshNvrChannelWarning();
+            }
+        }
+
+        function refreshNvrChannelWarning() {
+            const channels = toNum(nvrBox.channels, 0);
+            const el = document.getElementById('inspNvrWarn');
+            if (!el) return;
+            if (cameras.length > channels) {
+                el.textContent = `عدد الكاميرات (${cameras.length}) يتجاوز قنات جهاز التسجيل (${channels})`;
+                el.className = 'text-[11px] font-bold text-rose-400';
+            } else {
+                el.textContent = `${cameras.length} من ${channels} قناة مستخدمة`;
+                el.className = 'text-[11px] text-zinc-400';
+            }
+        }
+
+        function updateSelectedNvr() {
+            if (!selectedElement || selectedElement.type !== 'nvr') return;
+            nvrBox.label = document.getElementById('inspNvrLabel').value;
+            nvrBox.channels = toNum(document.getElementById('inspNvrChannels').value, 16);
+            refreshNvrChannelWarning();
+            drawFloorPlan();
+        }
+
+        function updateSelectedCamera() {
+            if (!selectedElement || selectedElement.type !== 'camera') return;
+            const cam = selectedElement.item;
+            cam.label = document.getElementById('inspCamLabel').value;
+            cam.res = document.getElementById('inspCamRes').value;
+            cam.dir = toNum(document.getElementById('inspCamDir').value, cam.dir);
+            cam.fov = toNum(document.getElementById('inspCamFov').value, cam.fov);
+            cam.range = toNum(document.getElementById('inspCamRange').value, cam.range);
+
+            setTextNode('inspCamDirVal', cam.dir);
+            setTextNode('inspCamFovVal', cam.fov);
+            setTextNode('inspCamRangeVal', fmtDec(pxToMeters(cam.range), 1));
+            drawFloorPlan();
+            // The camera's own resolution is what the storage engine bills for.
+            runStorageCalculations();
+        }
+
+        function updateSelectedRoom() {
+            if (!selectedElement || selectedElement.type !== 'room') return;
+            const room = selectedElement.item;
+            room.name = document.getElementById('inspRoomName').value;
+            room.w = toNum(document.getElementById('inspRoomW').value, room.w);
+            room.h = toNum(document.getElementById('inspRoomH').value, room.h);
+            room.dim = document.getElementById('inspRoomDim').value;
+            drawFloorPlan();
+        }
+
+        /** Resizing a room also rewrites its dimension caption, so the label and the
+         *  drawing can never disagree about how large the room is. */
+        function resizeSelectedRoom() {
+            if (!selectedElement || selectedElement.type !== 'room') return;
+            const room = selectedElement.item;
+            room.w = toNum(document.getElementById('inspRoomW').value, room.w);
+            room.h = toNum(document.getElementById('inspRoomH').value, room.h);
+            room.dim = `${fmtDec(pxToMeters(room.w), 1)}×${fmtDec(pxToMeters(room.h), 1)} م`;
+            document.getElementById('inspRoomDim').value = room.dim;
+            setTextNode('inspRoomWVal', fmtDec(pxToMeters(room.w), 1));
+            setTextNode('inspRoomHVal', fmtDec(pxToMeters(room.h), 1));
+            drawFloorPlan();
+        }
+
+        function addCamera() {
+            const newCam = {
+                id: 'c_' + Date.now(),
+                num: cameras.length + 1,
+                label: 'كاميرا داخلية',
+                res: `${selectedResolutionMP}M`,
+                x: 500,
+                y: 260,
+                dir: 45,
+                fov: 85,
+                range: metersToPx(6)
+            };
+            cameras.push(newCam);
+            selectedElement = { type: 'camera', item: newCam };
+            showInspectorForSelected();
+            drawFloorPlan();
+            runStorageCalculations();
+            showToast(`تمت إضافة كاميرا رقم ${newCam.num}`);
+        }
+
+        /** First rectangle of the requested size that does not overlap an existing room. */
+        function findFreeRoomSpot(w, h) {
+            const stepX = 20;
+            const stepY = 20;
+            for (let y = 10; y + h <= canvas.height - 10; y += stepY) {
+                for (let x = 10; x + w <= canvas.width - 10; x += stepX) {
+                    const hits = rooms.some(r =>
+                        x < r.x + r.w && x + w > r.x && y < r.y + r.h && y + h > r.y
+                    );
+                    if (!hits) return { x, y };
+                }
+            }
+            return { x: 380, y: 200 };
+        }
+
+        function addRoom() {
+            const w = 160;
+            const h = 110;
+            const spot = findFreeRoomSpot(w, h);
+            const newRoom = {
+                id: 'r_' + Date.now(),
+                name: 'غرفة جديدة',
+                dim: `${fmtDec(pxToMeters(w), 1)}×${fmtDec(pxToMeters(h), 1)} م`,
+                x: spot.x,
+                y: spot.y,
+                w: w,
+                h: h,
+                isSpecial: false
+            };
+            rooms.push(newRoom);
+            selectedElement = { type: 'room', item: newRoom };
+            showInspectorForSelected();
+            drawFloorPlan();
+            showToast('تمت إضافة غرفة جديدة إلى المخطط');
+        }
+
+        function deleteSelectedElement() {
+            if (!selectedElement) return;
+            if (selectedElement.type === 'camera') {
+                cameras = cameras.filter(c => c.id !== selectedElement.item.id);
+                showToast('تم حذف الكاميرا من المخطط');
+            } else if (selectedElement.type === 'room') {
+                rooms = rooms.filter(r => r.id !== selectedElement.item.id);
+                showToast('تم حذف الغرفة من المخطط');
+            } else if (selectedElement.type === 'nvr') {
+                showToast('لا يمكن حذف جهاز التسجيل — يمكن تغيير اسمه وعدد قناته فقط');
+                return;
+            }
+            selectedElement = null;
+            showInspectorForSelected();
+            drawFloorPlan();
+            runStorageCalculations();
+        }
+
+        function resetFloorPlan() {
+            rooms = JSON.parse(JSON.stringify(defaultPlanData.rooms));
+            cameras = JSON.parse(JSON.stringify(defaultPlanData.cameras));
+            nvrBox = JSON.parse(JSON.stringify(defaultPlanData.nvr));
+            selectedElement = null;
+            showInspectorForSelected();
+            drawFloorPlan();
+            syncCamerasToAll(false);
+            showToast('تمت استعادة المخطط الهندسي الافتراضي');
+        }
+
+        function syncCamerasToAll(announce = true) {
+            const count = cameras.length;
+            document.getElementById('calcCamCount').value = count;
+            runStorageCalculations();
+
+            const camItem = boqItems.find(item =>
+                String(item.category || '').includes('كاميرات') || String(item.name || '').includes('كاميرا')
+            );
+            if (camItem) {
+                camItem.qty = count;
+                renderBoqTable();
+            }
+            if (announce) {
+                showToast(`تمت مزامنة عدد الكاميرات (${count} كاميرا) مع الحاسبة والمقايسة`);
+            }
+        }
+
+        /********************************************************************
+         * 2. BI-DIRECTIONAL STORAGE CALCULATOR ENGINE (1MP ~ 10MP)
+         ********************************************************************/
+        let selectedResolutionMP = 5;
+        let currentStorageMode = 1;
+
+        const SUPPORTED_RESOLUTIONS = [1, 2, 3, 4, 5, 6, 10];
+
+        // Storage is measured the way vendors sell it: 1 GB = 10^9 bytes, 1 TB = 1000 GB.
+        // Mixing binary (1024) into the daily figures while the drive table and the
+        // available-space field used decimal units made the report disagree with itself.
+        const BYTES_PER_GB = 1e9;
+        const GB_PER_TB = 1000;
+
+        const baseBitrateKbps25FpsH264 = {
+            1: 1536,
+            2: 2560,
+            3: 3584,
+            4: 4096,
+            5: 5120,
+            6: 6144,
+            10: 10240
+        };
+
+        const codecFactors = {
+            'H.264': 1.0,
+            'H.264+': 0.65,
+            'H.265': 0.50,
+            'H.265+': 0.30 // the UI promises a 70% saving over H.264, so the factor must be 0.30
+        };
+
+        /** '5M' / 5 / '5 MP' -> 5, snapped to a resolution the engine actually models. */
+        function parseResMP(value) {
+            const mp = toNum(String(value == null ? '' : value).replace(/[^\d.]/g, ''), NaN);
+            if (!Number.isFinite(mp) || mp <= 0) return 5;
+            if (SUPPORTED_RESOLUTIONS.includes(mp)) return mp;
+            return SUPPORTED_RESOLUTIONS.reduce(
+                (best, r) => (Math.abs(r - mp) < Math.abs(best - mp) ? r : best),
+                SUPPORTED_RESOLUTIONS[0]
+            );
+        }
+
+        function describeResolutionMix(mpList) {
+            const counts = {};
+            mpList.forEach(mp => { counts[mp] = (counts[mp] || 0) + 1; });
+            return Object.keys(counts)
+                .map(Number)
+                .sort((a, b) => a - b)
+                .map(mp => `${counts[mp]}×${mp}ميجا`)
+                .join(' + ');
+        }
+
+        function getCameraBitrateKbps(resMP, codec, fps, qualityMultiplier) {
+            const base25 = baseBitrateKbps25FpsH264[parseResMP(resMP)] || 4096;
+            const codecFactor = codecFactors[codec] || 0.30;
+            const fpsFactor = fps / 25;
+            return Math.round(base25 * codecFactor * fpsFactor * qualityMultiplier);
+        }
+
+        function getDailyStorageGBPerCam(bitrateKbps, hoursPerDay) {
+            const bitsPerDay = bitrateKbps * 1000 * 3600 * hoursPerDay;
+            return bitsPerDay / 8 / BYTES_PER_GB;
+        }
+
+        /** A fraction of a recording day is a fraction of the hours recorded that day,
+         *  not a fraction of 24 wall-clock hours. */
+        function formatDuration(exactDays, hoursPerDay) {
+            let wholeDays = Math.floor(exactDays);
+            let remHours = Math.round((exactDays - wholeDays) * hoursPerDay);
+            if (remHours >= hoursPerDay) {
+                wholeDays += 1;
+                remHours = 0;
+            }
+            const totalHours = Math.round(exactDays * hoursPerDay);
+            const label = wholeDays >= 1
+                ? `${wholeDays} يوم${remHours > 0 ? ` و ${remHours} ساعة` : ''}`
+                : `${remHours} ساعة`;
+            return { wholeDays, remHours, totalHours, label };
+        }
+
+        function switchStorageMode(mode) {
+            currentStorageMode = mode;
+            const btn1 = document.getElementById('tabBtnMode1');
+            const btn2 = document.getElementById('tabBtnMode2');
+            const panel1 = document.getElementById('storageMode1Panel');
+            const panel2 = document.getElementById('storageMode2Panel');
+
+            if (mode === 1) {
+                btn1.className = 'py-2.5 px-4 rounded-lg font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 bg-[#FF6600] text-white shadow-lg';
+                btn2.className = 'py-2.5 px-4 rounded-lg font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 text-zinc-300 hover:text-white hover:bg-zinc-800';
+                panel1.classList.remove('hidden');
+                panel2.classList.add('hidden');
+            } else {
+                btn2.className = 'py-2.5 px-4 rounded-lg font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 bg-emerald-600 text-white shadow-lg';
+                btn1.className = 'py-2.5 px-4 rounded-lg font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 text-zinc-300 hover:text-white hover:bg-zinc-800';
+                panel2.classList.remove('hidden');
+                panel1.classList.add('hidden');
+            }
+            runStorageCalculations();
+        }
+
+        function selectResolution(resMP) {
+            selectedResolutionMP = resMP;
+            const buttons = document.querySelectorAll('.res-btn');
+            buttons.forEach(btn => {
+                const r = Number(btn.getAttribute('data-res'));
+                if (r === resMP) {
+                    btn.className = 'res-btn py-2 px-2.5 rounded-lg border-2 border-[#FF6600] bg-[#FF6600]/20 text-center transition shadow-md';
+                    btn.querySelector('div:first-child').className = 'font-black text-sm text-[#FF6600]';
+                } else {
+                    btn.className = 'res-btn py-2 px-2.5 rounded-lg border border-zinc-600 bg-zinc-900 hover:bg-zinc-700 text-center transition';
+                    btn.querySelector('div:first-child').className = 'font-black text-sm text-white';
+                }
+            });
+            runStorageCalculations();
+        }
+
+        function setQuickDays(days) {
+            document.getElementById('calcRequiredDays').value = days;
+            runStorageCalculations();
+        }
+
+        function setAvailableStorageGB(gb) {
+            if (gb >= 1000) {
+                document.getElementById('calcAvailableSpaceVal').value = gb / 1000;
+                document.getElementById('calcAvailableSpaceUnit').value = 'TB';
+            } else {
+                document.getElementById('calcAvailableSpaceVal').value = gb;
+                document.getElementById('calcAvailableSpaceUnit').value = 'GB';
+            }
+            runStorageCalculations();
+        }
+
+        function pullCamCountFromPlan() {
+            document.getElementById('calcCamCount').value = cameras.length;
+            runStorageCalculations();
+            showToast(`تم تحديث العدد إلى ${cameras.length} كاميرا من المخطط`);
+        }
+
+        let currentRecommendedHDD = { sizeTB: 4, price: 4200, qty: 1, name: 'هارد ديسك مراقبة 4TB WD Purple' };
+
+        const COMMERCIAL_DRIVES = [
+            { tb: 1, usableGB: 910, price: 2100 },
+            { tb: 2, usableGB: 1820, price: 2950 },
+            { tb: 4, usableGB: 3640, price: 4200 },
+            { tb: 6, usableGB: 5460, price: 6100 },
+            { tb: 8, usableGB: 7280, price: 8200 },
+            { tb: 10, usableGB: 9100, price: 10500 },
+            { tb: 12, usableGB: 10920, price: 12400 },
+            { tb: 16, usableGB: 14560, price: 16500 }
+        ];
+
+        const RES_LABELS = {
+            1: '1 ميجا (720p HD)',
+            2: '2 ميجا (1080p FHD)',
+            3: '3 ميجا (3MP 2K)',
+            4: '4 ميجا (4MP QHD)',
+            5: '5 ميجا (5MP Super HD)',
+            6: '6 ميجا (6MP 3K+)',
+            10: '10 ميجا (10MP Ultra HD)'
+        };
+
+        /**
+         * Resolve what the calculator is billing for: the real resolution of every
+         * camera on the plan when the user opts in, otherwise one uniform resolution
+         * applied to the typed camera count.
+         */
+        function resolveCameraLoad(codec, fps, qualityMult, hoursPerDay) {
+            const manualCount = Math.max(1, Math.round(toNum(document.getElementById('calcCamCount').value, 1)));
+            const mixEnabled = document.getElementById('calcUsePlanMix').checked && cameras.length > 0;
+            const mpList = mixEnabled ? cameras.map(c => parseResMP(c.res)) : null;
+            const count = mixEnabled ? mpList.length : manualCount;
+            const bitrates = mixEnabled
+                ? mpList.map(mp => getCameraBitrateKbps(mp, codec, fps, qualityMult))
+                : new Array(count).fill(getCameraBitrateKbps(selectedResolutionMP, codec, fps, qualityMult));
+
+            const totalBitrateKbps = bitrates.reduce((s, b) => s + b, 0);
+            const dailyList = bitrates.map(b => getDailyStorageGBPerCam(b, hoursPerDay));
+            const allDailyGB = dailyList.reduce((s, d) => s + d, 0);
+
+            return {
+                mixEnabled,
+                count,
+                mpList,
+                resLabel: mixEnabled ? describeResolutionMix(mpList) : `${selectedResolutionMP} ميجا`,
+                avgBitrateKbps: count > 0 ? Math.round(totalBitrateKbps / count) : 0,
+                uniformBitrateKbps: mixEnabled ? null : bitrates[0],
+                totalBandwidthMbps: totalBitrateKbps / 1000,
+                avgDailyGB: count > 0 ? allDailyGB / count : 0,
+                allDailyGB,
+                singleDailyGB: mixEnabled ? allDailyGB / count : dailyList[0]
+            };
+        }
+
+        function formatSpaceGB(gb) {
+            return gb >= GB_PER_TB
+                ? `${fmtDec(gb / GB_PER_TB, 2)} TB`
+                : `${fmtInt(gb)} GB`;
+        }
+
+        function runStorageCalculations() {
+            const codec = document.getElementById('calcCodec').value;
+            const fps = toNum(document.getElementById('calcFps').value, 20) || 20;
+            const qualityMult = toNum(document.getElementById('calcQuality').value, 1.0) || 1.0;
+            const hoursPerDay = toNum(document.getElementById('calcHoursPerDay').value, 24) || 24;
+            const reqDays = Math.max(1, Math.round(toNum(document.getElementById('calcRequiredDays').value, 15) || 15));
+
+            const availVal = Math.max(0.1, toNum(document.getElementById('calcAvailableSpaceVal').value, 4) || 4);
+            const availUnit = document.getElementById('calcAvailableSpaceUnit').value;
+            const useFormatted = document.getElementById('calcUseFormattedCap').checked;
+
+            const rawAvailableGB = availUnit === 'TB' ? availVal * GB_PER_TB : availVal;
+            const usableAvailableGB = useFormatted ? rawAvailableGB * 0.91 : rawAvailableGB;
+
+            const load = resolveCameraLoad(codec, fps, qualityMult, hoursPerDay);
+            const allDailyGB = load.allDailyGB;
+            const totalRequiredGB = allDailyGB * reqDays;
+            const totalRequiredTB = totalRequiredGB / GB_PER_TB;
+
+            setTextNode('outSingleBitrate', `${fmtInt(load.avgBitrateKbps)} Kbps`);
+            setTextNode('outTotalBandwidth', `${fmtDec(load.totalBandwidthMbps, 1)} Mbps`);
+            setTextNode('outSingleDailyGB', `${fmtDec(load.singleDailyGB, 1)} GB / يوم`);
+            setTextNode('outAllDailyGB', `${fmtDec(allDailyGB, 1)} GB / يوم`);
+            setTextNode('mode1SummaryBadge', `${load.count} كاميرا × ${load.resLabel} × ${reqDays} يوم (${hoursPerDay} س/يوم)`);
+
+            setTextNode('outRequiredSpaceTB', totalRequiredTB >= 1
+                ? `${fmtDec(totalRequiredTB, 2)} TB`
+                : `${fmtInt(totalRequiredGB)} GB`);
+            setTextNode('outRequiredSpaceGB', `(${fmtInt(totalRequiredGB)} GB صافي)`);
+
+            const chosenDrive = COMMERCIAL_DRIVES.find(d => d.usableGB >= totalRequiredGB);
+            let recUsableGB;
+            if (!chosenDrive) {
+                const largest = COMMERCIAL_DRIVES[COMMERCIAL_DRIVES.length - 1];
+                const countDrives = Math.ceil(totalRequiredGB / largest.usableGB);
+                currentRecommendedHDD = {
+                    sizeTB: largest.tb,
+                    price: largest.price,
+                    qty: countDrives,
+                    name: `هارد ديسك مراقبة ${largest.tb}TB WD Purple`
+                };
+                recUsableGB = countDrives * largest.usableGB;
+                setTextNode('outRecommendedHDD', `${fmtInt(countDrives)} × هارد ${largest.tb} تيرابايت (${fmtInt(countDrives * largest.tb)}TB)`);
+                setTextNode('outRecommendedHDDNote', `إجمالي المساحة الفعلية ~ ${fmtInt(recUsableGB)} GB`);
+            } else {
+                currentRecommendedHDD = {
+                    sizeTB: chosenDrive.tb,
+                    price: chosenDrive.price,
+                    qty: 1,
+                    name: `هارد ديسك مراقبة ${chosenDrive.tb}TB WD Purple`
+                };
+                recUsableGB = chosenDrive.usableGB;
+                setTextNode('outRecommendedHDD', `هارد ${chosenDrive.tb} تيرابايت (${chosenDrive.tb}TB)`);
+                setTextNode('outRecommendedHDDNote', `المساحة الفعلية بعد الفورمات ~ ${fmtInt(chosenDrive.usableGB)} GB`);
+            }
+            const recDuration = formatDuration(recUsableGB / allDailyGB, hoursPerDay);
+            setTextNode('outRecHDDActualDays', recDuration.label);
+
+            const availDuration = formatDuration(usableAvailableGB / allDailyGB, hoursPerDay);
+            setTextNode('outMode2ResLabel', load.resLabel);
+            setTextNode('outUsableSpaceBadge', `المساحة الفعلية: ${fmtInt(usableAvailableGB)} GB`);
+            setTextNode('outMode2CamCount', `${load.count} (${load.resLabel})`);
+            setTextNode('outMode2DurationBig', availDuration.label);
+            setTextNode('outMode2TotalHours', `(إجمالي ${fmtInt(availDuration.totalHours)} ساعة تسجيل فعلي عند ${hoursPerDay} ساعة/يوم)`);
+
+            setTextNode('matrixSummarySubtitle', `لعدد ${load.count} كاميرا | ضغط ${codec} | ${fps} إطار/ثانية | ${hoursPerDay} ساعة/يوم`);
+            setTextNode('tblCamCountHeader', load.count);
+            setTextNode('tblDaysHeader', reqDays);
+            setTextNode('tblAvailSpaceHeader', `${availVal} ${availUnit}`);
+
+            updateStoragePrintSummary(load, {
+                codec, fps, hoursPerDay, reqDays,
+                totalRequiredGB, usableAvailableGB,
+                availLabel: `${availVal} ${availUnit}`,
+                duration: availDuration
+            });
+
+            // Uniform-resolution matrix: one row per resolution, same camera count.
+            let rowsHtml = '';
+            for (let i = 0; i < SUPPORTED_RESOLUTIONS.length; i++) {
+                const mp = SUPPORTED_RESOLUTIONS[i];
+                const br = getCameraBitrateKbps(mp, codec, fps, qualityMult);
+                const dailyAll = getDailyStorageGBPerCam(br, hoursPerDay) * load.count;
+                const reqSpaceForDaysGB = dailyAll * reqDays;
+                const reqSpaceFormatted = reqSpaceForDaysGB >= GB_PER_TB
+                    ? `${fmtDec(reqSpaceForDaysGB / GB_PER_TB, 2)} TB (${fmtInt(reqSpaceForDaysGB)} GB)`
+                    : `${fmtInt(reqSpaceForDaysGB)} GB`;
+                const duration = formatDuration(usableAvailableGB / dailyAll, hoursPerDay);
+
+                const isSelectedRow = !load.mixEnabled && mp === selectedResolutionMP;
+                const rowClass = isSelectedRow
+                    ? 'bg-[#FF6600]/20 font-bold text-white border-r-4 border-[#FF6600]'
+                    : 'hover:bg-zinc-900/60 text-zinc-300';
+
+                rowsHtml += `
+                    <tr class="${rowClass}">
+                        <td class="py-2.5 px-3">
+                            <span>${escapeHtml(RES_LABELS[mp])}</span>
+                            ${isSelectedRow ? '<span class="text-[10px] bg-[#FF6600] text-white px-1.5 py-0.5 rounded font-black mr-1.5">المختارة</span>' : ''}
+                        </td>
+                        <td class="py-2.5 px-3" dir="ltr">${fmtInt(br)} Kbps</td>
+                        <td class="py-2.5 px-3" dir="ltr">${fmtDec(dailyAll, 1)} GB / يوم</td>
+                        <td class="py-2.5 px-3 text-orange-300 font-bold" dir="ltr">${reqSpaceFormatted}</td>
+                        <td class="py-2.5 px-3 text-emerald-300 font-bold">${duration.label}</td>
+                    </tr>
+                `;
+            }
+            document.getElementById('resComparisonTableBody').innerHTML = rowsHtml;
+        }
+
+        /** The interactive panels are .no-print, so the report needs these figures
+         *  mirrored into a block that only appears on paper / in the PDF. */
+        function updateStoragePrintSummary(load, ctx) {
+            setTextNode('pSumCamCount', `${load.count} كاميرا`);
+            setTextNode('pSumResList', load.resLabel);
+            setTextNode('pSumParams', `${ctx.codec} | ${ctx.fps} FPS | ${ctx.hoursPerDay} ساعة/يوم`);
+            setTextNode('pSumBitrate', `${fmtInt(load.avgBitrateKbps)} Kbps`);
+            setTextNode('pSumBandwidth', `${fmtDec(load.totalBandwidthMbps, 1)} Mbps`);
+            setTextNode('pSumDaily', `${fmtDec(load.allDailyGB, 1)} GB/يوم`);
+            setTextNode('pSumReqDays', ctx.reqDays);
+            setTextNode('pSumRequired', `${formatSpaceGB(ctx.totalRequiredGB)} (${fmtInt(ctx.totalRequiredGB)} GB)`);
+            setTextNode('pSumHDD', currentRecommendedHDD.qty > 1
+                ? `${currentRecommendedHDD.qty} × ${currentRecommendedHDD.name}`
+                : currentRecommendedHDD.name);
+            setTextNode('pSumRecordDays', `${ctx.duration.label} على ${fmtInt(ctx.usableAvailableGB)} GB (متوفر ${ctx.availLabel})`);
+        }
+
+        function addRecommendedHddToBoq() {
+            addPresetItem(
+                currentRecommendedHDD.name,
+                'وحدات تخزين',
+                currentRecommendedHDD.qty || 1,
+                currentRecommendedHDD.price
+            );
+        }
+
+        function toggleStoragePrint() {
+            const checked = document.getElementById('includeStorageInPrint').checked;
+            const sec = document.getElementById('section-storage');
+            if (checked) {
+                sec.classList.remove('print-hidden');
+            } else {
+                sec.classList.add('print-hidden');
+            }
+        }
+
+        /********************************************************************
+         * 3. BILL OF QUANTITIES (BOQ) & EDITABLE TENDA PRODUCT CATALOG
+         ********************************************************************/
+        // يمكنك تعديل قائمة منتجات Tenda الافتراضية من هنا مباشرة أو من زر "تعديل قائمة المنتجات" داخل البرنامج
+        const DEFAULT_TENDA_CATALOG = [
+            { name: 'كاميرا داخلي Tenda IT7-LMS (4MP PoE)', category: 'كاميرات Tenda', qty: 1, price: 950 },
+            { name: 'كاميرا خارجي Tenda IC7-FRS (4MP PoE)', category: 'كاميرات Tenda', qty: 1, price: 1100 },
+            { name: 'كاميرا متحركة Tenda CP6 (3MP 2K Pan/Tilt)', category: 'كاميرات Tenda', qty: 1, price: 850 },
+            { name: 'كاميرا خارجي Tenda CT6 (2K Wi-Fi Full-Color)', category: 'كاميرات Tenda', qty: 1, price: 1250 },
+            { name: 'كاميرا فائقة الدقة Tenda Ultra HD (10MP)', category: 'كاميرات Tenda', qty: 1, price: 1950 },
+            { name: 'جهاز تسجيل Tenda N6P-8H (8CH PoE NVR)', category: 'أجهزة تسجيل Tenda', qty: 1, price: 2200 },
+            { name: 'جهاز تسجيل Tenda N6P-16H (16CH PoE 4K NVR)', category: 'أجهزة تسجيل Tenda', qty: 1, price: 2950 },
+            { name: 'سويتش Tenda TEG1109P-8-102W (8-Port PoE)', category: 'سويتشات Tenda', qty: 1, price: 1850 },
+            { name: 'هارد ديسك مراقبة 4TB WD Purple', category: 'وحدات تخزين', qty: 1, price: 4200 }
+        ];
+
+        let tendaCatalogItems = loadCatalogFromStorage();
+
+        /** Anything read back from localStorage is untrusted: keep only well-shaped rows. */
+        function sanitizeCatalog(rows) {
+            if (!Array.isArray(rows)) return null;
+            const cleaned = rows
+                .filter(r => r && typeof r === 'object' && String(r.name || '').trim())
+                .map(r => ({
+                    name: String(r.name).trim(),
+                    category: String(r.category || 'كاميرات Tenda').trim(),
+                    qty: Math.max(1, Math.round(toNum(r.qty, 1))),
+                    price: Math.max(0, toNum(r.price, 0))
+                }));
+            return cleaned.length > 0 ? cleaned : null;
+        }
+
+        function loadCatalogFromStorage() {
+            try {
+                const saved = localStorage.getItem('tenda_planner_catalog_v1');
+                if (saved) {
+                    const cleaned = sanitizeCatalog(JSON.parse(saved));
+                    if (cleaned) return cleaned;
+                }
+            } catch (e) {}
+            return JSON.parse(JSON.stringify(DEFAULT_TENDA_CATALOG));
+        }
+
+        function saveCatalogToStorage() {
+            try {
+                localStorage.setItem('tenda_planner_catalog_v1', JSON.stringify(tendaCatalogItems));
+            } catch (e) {}
+        }
+
+        function renderCatalogDropdown() {
+            const sel = document.getElementById('tendaQuickCatalog');
+            if (!sel) return;
+            // The option value is only the row index: the previous "name|category|qty|price"
+            // encoding broke on any name containing | or " and silently corrupted the item.
+            let optionsHtml = '<option value="">+ اختر منتج Tenda لإضافته للمقايسة...</option>';
+            for (let i = 0; i < tendaCatalogItems.length; i++) {
+                const item = tendaCatalogItems[i];
+                optionsHtml += `<option value="${i}">${escapeHtml(item.name)} - ${fmtInt(item.price)} ج.م</option>`;
+            }
+            sel.innerHTML = optionsHtml;
+        }
+
+        function openCatalogModal() {
+            renderCatalogEditorTable();
+            document.getElementById('catalogEditorModal').classList.remove('hidden');
+        }
+
+        function closeCatalogModal() {
+            document.getElementById('catalogEditorModal').classList.add('hidden');
+            renderCatalogDropdown();
+        }
+
+        // Escape is the only keyboard way out of the modals.
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            if (!document.getElementById('clientGuideModal').classList.contains('hidden')) {
+                closeGuideModal();
+            } else if (!document.getElementById('catalogEditorModal').classList.contains('hidden')) {
+                closeCatalogModal();
+            }
+        });
+
+        function renderCatalogEditorTable() {
+            const tbody = document.getElementById('catalogEditorTableBody');
+            let html = '';
+            for (let i = 0; i < tendaCatalogItems.length; i++) {
+                const item = tendaCatalogItems[i];
+                html += `
+                    <tr class="hover:bg-orange-50/40">
+                        <td class="py-2 px-3 font-bold text-zinc-400">${i + 1}</td>
+                        <td class="py-2 px-3">
+                            <input type="text" value="${escapeHtml(item.name)}" oninput="updateCatalogItem(${i}, 'name', this.value)" class="w-full bg-zinc-50 border border-zinc-300 rounded px-2.5 py-1 font-bold text-zinc-900 focus:border-[#FF5500] outline-none" />
+                        </td>
+                        <td class="py-2 px-3 text-center">
+                            <input type="text" value="${escapeHtml(item.category)}" oninput="updateCatalogItem(${i}, 'category', this.value)" class="w-full bg-zinc-50 border border-zinc-300 rounded px-2 py-1 text-center text-zinc-700 focus:border-[#FF5500] outline-none" />
+                        </td>
+                        <td class="py-2 px-3 text-center">
+                            <input type="number" value="${toNum(item.qty, 1)}" min="1" oninput="updateCatalogItem(${i}, 'qty', this.value)" class="w-20 bg-zinc-50 border border-zinc-300 rounded px-2 py-1 text-center font-bold text-zinc-900 focus:border-[#FF5500] outline-none" />
+                        </td>
+                        <td class="py-2 px-3 text-center">
+                            <input type="number" value="${toNum(item.price, 0)}" min="0" oninput="updateCatalogItem(${i}, 'price', this.value)" class="w-24 bg-zinc-50 border border-zinc-300 rounded px-2 py-1 text-center font-bold text-[#FF5500] focus:border-[#FF5500] outline-none" />
+                        </td>
+                        <td class="py-2 px-3 text-center">
+                            <button type="button" onclick="deleteCatalogItem(${i})" class="text-zinc-400 hover:text-rose-600 transition" title="حذف من القائمة">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }
+            tbody.innerHTML = html;
+        }
+
+        function updateCatalogItem(index, field, val) {
+            if (!tendaCatalogItems[index]) return;
+            if (field === 'price' || field === 'qty') {
+                tendaCatalogItems[index][field] = Math.max(0, toNum(val, 0));
+            } else {
+                tendaCatalogItems[index][field] = val;
+            }
+            saveCatalogToStorage();
+            renderCatalogDropdown();
+        }
+
+        function addNewProductToCatalog() {
+            const nameInput = document.getElementById('newCatName');
+            const catInput = document.getElementById('newCatCategory');
+            const priceInput = document.getElementById('newCatPrice');
+
+            const name = nameInput.value.trim();
+            const category = catInput.value.trim() || 'كاميرات Tenda';
+            const price = Math.max(0, toNum(priceInput.value, 0));
+
+            if (!name) {
+                showToast('يرجى كتابة اسم وموديل المنتج أولاً');
+                return;
+            }
+
+            tendaCatalogItems.push({ name, category, qty: 1, price });
+            saveCatalogToStorage();
+            renderCatalogEditorTable();
+            renderCatalogDropdown();
+            nameInput.value = '';
+            showToast(`تمت إضافة "${name}" إلى القائمة المنسدلة`);
+        }
+
+        function deleteCatalogItem(index) {
+            tendaCatalogItems.splice(index, 1);
+            saveCatalogToStorage();
+            renderCatalogEditorTable();
+            renderCatalogDropdown();
+        }
+
+        function resetCatalogToDefaults() {
+            tendaCatalogItems = JSON.parse(JSON.stringify(DEFAULT_TENDA_CATALOG));
+            saveCatalogToStorage();
+            renderCatalogEditorTable();
+            renderCatalogDropdown();
+            showToast('تمت استعادة قائمة منتجات Tenda الافتراضية');
+        }
+
+        function copyCatalogCodeToClipboard() {
+            const codeString = `const DEFAULT_TENDA_CATALOG = ${JSON.stringify(tendaCatalogItems, null, 4)};`;
+            const fallbackCopy = () => {
+                const tempArea = document.createElement('textarea');
+                tempArea.value = codeString;
+                tempArea.setAttribute('aria-hidden', 'true');
+                document.body.appendChild(tempArea);
+                tempArea.select();
+                let ok = false;
+                try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+                document.body.removeChild(tempArea);
+                showToast(ok
+                    ? 'تم نسخ كود القائمة! يمكنك لصقه مكان DEFAULT_TENDA_CATALOG في الكود'
+                    : 'تعذّر النسخ التلقائي — حدّد الكود يدويًا من نافذة المطور');
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(codeString)
+                    .then(() => showToast('تم نسخ كود القائمة! يمكنك لصقه مكان DEFAULT_TENDA_CATALOG في الكود'))
+                    .catch(fallbackCopy);
+            } else {
+                fallbackCopy();
+            }
+        }
+
+        let boqItems = [
+            { id: 1, name: 'افيز 25', category: 'اكسسوارات', qty: 90, price: 2 },
+            { id: 2, name: 'ارجيه cat 6', category: 'اكسسوارات', qty: 30, price: 5 },
+            { id: 3, name: 'مشارك PDU', category: 'اكسسوارات', qty: 1, price: 240 },
+            { id: 4, name: 'Rack 12U', category: 'Rack', qty: 1, price: 600 },
+            { id: 5, name: 'NVR 16P 5M Tenda PoE', category: 'NVR', qty: 1, price: 2500 },
+            { id: 6, name: 'ماسوره PVC 3M', category: 'مواسير وبواطات', qty: 30, price: 25 },
+            { id: 7, name: 'بواط 10*10', category: 'اكسسوارات', qty: 10, price: 15 },
+            { id: 8, name: 'لفه سلك Legrand 350M', category: 'أسلاك وكابلات', qty: 1, price: 600 },
+            { id: 9, name: 'كاميرا داخلي 5M Tenda IP', category: 'كاميرات مراقبة', qty: 10, price: 800 }
+        ];
+
+        function addSelectedCatalogProduct() {
+            const sel = document.getElementById('tendaQuickCatalog');
+            if (!sel.value) {
+                showToast('يرجى اختيار منتج Tenda من القائمة أولاً');
+                return;
+            }
+            const item = tendaCatalogItems[toNum(sel.value, -1)];
+            sel.value = '';
+            if (!item) {
+                showToast('العنصر المختار لم يعد موجودًا في القائمة');
+                return;
+            }
+            addPresetItem(item.name, item.category, toNum(item.qty, 1), toNum(item.price, 0));
+        }
+
+        function renderBoqTable() {
+            const tbody = document.getElementById('boqTableBody');
+            let html = '';
+
+            for (let index = 0; index < boqItems.length; index++) {
+                const item = boqItems[index];
+                const qty = Math.max(0, toNum(item.qty, 0));
+                const price = Math.max(0, toNum(item.price, 0));
+                const rowTotal = qty * price;
+
+                html += `
+                    <tr class="hover:bg-orange-50/40 transition">
+                        <td class="py-2.5 px-3 border-l border-zinc-200">
+                            <input type="text" value="${escapeHtml(item.name)}" oninput="updateBoqItem(${index}, 'name', this.value)" class="editable-field font-bold text-zinc-900 w-full" />
+                            <span id="boqMirrorName_${index}" class="print-text-mirror font-bold text-zinc-900">${escapeHtml(item.name)}</span>
+                        </td>
+                        <td class="py-2.5 px-3 border-l border-zinc-200 text-center">
+                            <input type="text" value="${escapeHtml(item.category)}" oninput="updateBoqItem(${index}, 'category', this.value)" class="editable-field text-zinc-600 text-center w-full" />
+                            <span id="boqMirrorCat_${index}" class="print-text-mirror text-zinc-700">${escapeHtml(item.category)}</span>
+                        </td>
+                        <td class="py-2.5 px-3 border-l border-zinc-200 text-center">
+                            <input type="number" value="${qty}" min="0" oninput="updateBoqItem(${index}, 'qty', this.value)" class="editable-field font-bold text-zinc-900 text-center w-20" />
+                            <span id="boqMirrorQty_${index}" class="print-text-mirror font-bold text-zinc-900">${fmtInt(qty)}</span>
+                        </td>
+                        <td class="py-2.5 px-3 border-l border-zinc-200 text-center">
+                            <div class="flex items-center justify-center gap-1">
+                                <input type="number" value="${price}" min="0" oninput="updateBoqItem(${index}, 'price', this.value)" class="editable-field text-zinc-700 text-center w-20" />
+                                <span id="boqMirrorPrice_${index}" class="print-text-mirror font-semibold text-zinc-800">${fmtInt(price)}</span>
+                                <span class="text-xs text-zinc-500">ج.م</span>
+                            </div>
+                        </td>
+                        <td class="py-2.5 px-3 text-center font-extrabold text-zinc-900" id="boqRowTotal_${index}">
+                            ${fmtInt(rowTotal)} ج.م
+                        </td>
+                        <td class="no-print py-2.5 px-2 text-center">
+                            <button type="button" onclick="removeBoqRow(${index})" class="text-zinc-400 hover:text-rose-600 transition" title="حذف البند">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }
+
+            tbody.innerHTML = html;
+            refreshBoqTotals();
+        }
+
+        function updateBoqItem(index, field, value) {
+            if (!boqItems[index]) return;
+            if (field === 'qty' || field === 'price') {
+                boqItems[index][field] = Math.max(0, toNum(value, 0));
+            } else {
+                boqItems[index][field] = value;
+            }
+            refreshBoqTotals();
+        }
+
+        /** Mirrors are positional by index, so they are rewritten from the live rows. */
+        function refreshBoqTotals() {
+            boqItems.forEach((item, index) => {
+                setTextNode(`boqMirrorName_${index}`, String(item.name == null ? '' : item.name));
+                setTextNode(`boqMirrorCat_${index}`, String(item.category == null ? '' : item.category));
+                setTextNode(`boqMirrorQty_${index}`, fmtInt(toNum(item.qty, 0)));
+                setTextNode(`boqMirrorPrice_${index}`, fmtInt(toNum(item.price, 0)));
+                const rowTotal = Math.max(0, toNum(item.qty, 0)) * Math.max(0, toNum(item.price, 0));
+                setTextNode(`boqRowTotal_${index}`, `${fmtInt(rowTotal)} ج.م`);
+            });
+
+            const grandTotal = boqItems.reduce(
+                (sum, it) => sum + Math.max(0, toNum(it.qty, 0)) * Math.max(0, toNum(it.price, 0)),
+                0
+            );
+            setTextNode('grandTotalDisplay', `${fmtInt(grandTotal)} ج.م`);
+        }
+
+        function addBoqRow() {
+            boqItems.push({
+                id: Date.now(),
+                name: 'بند جديد',
+                category: 'اكسسوارات',
+                qty: 1,
+                price: 100
+            });
+            renderBoqTable();
+            showToast('تمت إضافة بند جديد إلى المقايسة');
+        }
+
+        function addPresetItem(name, category, qty, price) {
+            const safeQty = Math.max(0, Math.round(toNum(qty, 1)));
+            const safePrice = Math.max(0, toNum(price, 0));
+            const existing = boqItems.find(i => i.name === name);
+            if (existing) {
+                existing.qty = Math.max(0, toNum(existing.qty, 0)) + safeQty;
+                // The freshly chosen price wins: keeping a stale one made the totals
+                // disagree with the catalogue the item came from.
+                existing.price = safePrice;
+                if (!existing.category && category) existing.category = category;
+            } else {
+                boqItems.push({ id: Date.now(), name, category, qty: safeQty, price: safePrice });
+            }
+            renderBoqTable();
+            showToast(`تمت إضافة "${name}" إلى جدول الكميات والأسعار`);
+        }
+
+        function removeBoqRow(index) {
+            boqItems.splice(index, 1);
+            renderBoqTable();
+        }
+
+        let toastTimeout = null;
+        function showToast(message) {
+            const toast = document.getElementById('toastMsg');
+            const text = document.getElementById('toastText');
+            text.textContent = message;
+            toast.classList.remove('hidden');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 2500);
+        }
+
+        /********************************************************************
+         * 4. GUARANTEED PRINT, A4 PREVIEW & DIRECT PDF EXPORT ENGINE
+         ********************************************************************
+         * Printing and PDF export are temporary overlays on top of edit mode, so
+         * every entry point must leave the app in the view the user started from. */
+        let isPdfExporting = false;
+        let enteredA4ForPrint = false;
+
+        function isA4PreviewActive() {
+            return document.body.classList.contains('a4-print-mode');
+        }
+
+        /**
+         * html2canvas cannot resolve a <use> that points into a different <svg>, so the
+         * shared wordmark is cloned into each host svg before the sheet is rasterized.
+         * Without this the header logo and the page watermark silently vanish from the PDF.
+         */
+        function hydrateBrandLogos() {
+            const proto = document.getElementById('tenda-official-logo');
+            if (!proto) return;
+            document.querySelectorAll('use').forEach(useEl => {
+                const ref = (useEl.getAttribute('href') || useEl.getAttribute('xlink:href') || '').replace(/^#/, '');
+                if (ref !== 'tenda-official-logo') return;
+                const host = useEl.parentNode;
+                if (!host || host.querySelector('[data-brand-logo]')) return;
+                const clone = proto.cloneNode(true);
+                clone.removeAttribute('id');
+                clone.setAttribute('data-brand-logo', '');
+                host.insertBefore(clone, useEl);
+                host.removeChild(useEl);
+            });
+        }
+
+        function syncPrintMirrors() {
+            const fields = ['reportDate', 'projectName', 'clientName', 'engineerInfo', 'warrantyInfo', 'floorTitleInput'];
+            for (let i = 0; i < fields.length; i++) {
+                const id = fields[i];
+                const inputEl = document.getElementById(id);
+                const mirrorEl = document.getElementById('mirror_' + id);
+                if (inputEl && mirrorEl) {
+                    mirrorEl.textContent = inputEl.value;
+                    applyBidiDirectionPass(mirrorEl);
+                }
+            }
+        }
+
+        /** Fixed-format stamp: never depends on the browser locale for the printed report. */
+        function updateLiveTimestamp() {
+            const now = new Date();
+            const p = n => String(n).padStart(2, '0');
+            setTextNode('liveTimestamp', `${now.getFullYear()}/${p(now.getMonth() + 1)}/${p(now.getDate())} ${p(now.getHours())}:${p(now.getMinutes())}`);
+        }
+
+        function prepareReportSnapshotForPrint() {
+            // Deselect any active canvas element so selection dashed rings don't appear in print
+            if (selectedElement) {
+                selectedElement = null;
+                showInspectorForSelected();
+            }
+            drawFloorPlan();
+            syncPrintMirrors();
+            updateLiveTimestamp();
+            hydrateBrandLogos();
+            applyBidiDirectionPass(document.getElementById('printableReportContainer') || document.body);
+
+            // Convert HTML5 Canvas to high-res PNG image so it prints and exports to PDF 100% reliably
+            try {
+                const dataUrl = canvas.toDataURL('image/png', 1.0);
+                const printImg = document.getElementById('floorPlanPrintImg');
+                if (printImg) {
+                    printImg.src = dataUrl;
+                }
+            } catch (err) {
+                console.warn('Canvas snapshot error:', err);
+            }
+        }
+
+        function enterA4PreviewMode() {
+            prepareReportSnapshotForPrint();
+            document.body.classList.add('a4-print-mode');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function exitA4PreviewMode() {
+            enteredA4ForPrint = false;
+            document.body.classList.remove('a4-print-mode');
+            document.body.classList.remove('pdf-exporting-mode');
+            drawFloorPlan();
+        }
+
+        /** The A4 view is only forced for the duration of the native dialog. */
+        function restoreViewAfterNativePrint() {
+            if (enteredA4ForPrint) {
+                enteredA4ForPrint = false;
+                exitA4PreviewMode();
+            } else {
+                drawFloorPlan();
+            }
+        }
+
+        function triggerSmartPrint() {
+            if (isPdfExporting) {
+                showToast('يرجى انتظار انتهاء تصدير PDF الحالي');
+                return;
+            }
+            prepareReportSnapshotForPrint();
+            // Switch into clean A4 view first so the user always sees the print layout
+            enteredA4ForPrint = !isA4PreviewActive();
+            if (enteredA4ForPrint) {
+                document.body.classList.add('a4-print-mode');
+            }
+
+            setTimeout(() => {
+                try {
+                    window.focus();
+                    window.print();
+                } catch (e) {
+                    restoreViewAfterNativePrint();
+                    showToast('تعذرت الطباعة المدمجة، استخدم زر تحميل PDF');
+                }
+            }, 250);
+        }
+
+        /**
+         * Prints a clean copy of the report in its own window. This is a fallback
+         * path, so it never also fires window.print() — that produced two dialogs.
+         */
+        function openStandalonePrintWindow() {
+            if (isPdfExporting) {
+                showToast('يرجى انتظار انتهاء تصدير PDF الحالي');
+                return;
+            }
+            prepareReportSnapshotForPrint();
+
+            let printWin = null;
+            try {
+                printWin = window.open('', '_blank', 'width=1050,height=850');
+            } catch (err) {
+                printWin = null;
+            }
+
+            if (!printWin || !printWin.document) {
+                showToast('المتصفح منع النافذة المنبثقة — استخدم "طباعة التقرير" أو Ctrl+P');
+                return;
+            }
+
+            try {
+                const reportHtml = document.getElementById('printableReportContainer').outerHTML;
+                const stylesHtml = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+                    .map(el => el.outerHTML)
+                    .join('\n');
+                const hiddenSvg = document.querySelector('svg.hidden');
+                const svgDefs = hiddenSvg ? hiddenSvg.outerHTML : '';
+
+                printWin.document.open();
+                printWin.document.write(`
+                    <!DOCTYPE html>
+                    <html lang="ar" dir="rtl">
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>Tenda Smart Planner PRO v1.0 - طباعة التقرير</title>
+                        <script src="https://cdn.tailwindcss.com"><\/script>
+                        ${stylesHtml}
+                    </head>
+                    <body class="a4-print-mode bg-white p-4" onload="setTimeout(function(){ window.focus(); window.print(); }, 500)">
+                        ${svgDefs}
+                        ${reportHtml}
+                    </body>
+                    </html>
+                `);
+                printWin.document.close();
+            } catch (err) {
+                console.error('Standalone print window error:', err);
+                showToast('تعذر تجهيز نافذة الطباعة، جرّب تحميل PDF المباشر');
+            }
+        }
+
+        async function downloadReportPDF() {
+            if (isPdfExporting) {
+                showToast('تصدير PDF قيد التنفيذ بالفعل، انتظر قليلًا');
+                return;
+            }
+            if (typeof html2pdf === 'undefined') {
+                showToast('جاري تجهيز محرك الـ PDF... يرجى المحاولة بعد ثانية');
+                return;
+            }
+
+            prepareReportSnapshotForPrint();
+            const wasInPreview = isA4PreviewActive();
+            isPdfExporting = true;
+            document.body.classList.add('a4-print-mode', 'pdf-exporting-mode');
+
+            const btnTop = document.getElementById('btnDownloadPdfTop');
+            const btnPrev = document.getElementById('btnDownloadPdfPreview');
+            const pdfButtons = [btnTop, btnPrev].filter(Boolean);
+            const spinnerHtml = '<i class="fa-solid fa-spinner fa-spin"></i><span>جاري تجهيز PDF...</span>';
+
+            pdfButtons.forEach(btn => {
+                btn.dataset.originalHtml = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = spinnerHtml;
+            });
+
+            const element = document.getElementById('printableReportContainer');
+            const projectTitle = String((document.getElementById('projectName') || {}).value || '').replace(/[^a-zA-Z0-9\u0600-\u06FF\s-_]/g, '').trim();
+
+            const opt = {
+                margin: [6, 6, 6, 6],
+                filename: `${projectTitle || 'Tenda_Smart_Planner'}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: {
+                    scale: 2,
+                    useCORS: true,
+                    scrollY: 0,
+                    backgroundColor: '#ffffff',
+                    onclone: clonedDoc => {
+                        // html2pdf clones the sheet under its own container, so two elements
+                        // share the report id here — work from the body instead.
+                        splitTextNodesByBidiRuns(clonedDoc.body);
+                    }
+                },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+            };
+
+            try {
+                installRasterBidiPatch();
+                await html2pdf().set(opt).from(element).save();
+                showToast('تم تحميل التقرير بصيغة PDF بنجاح!');
+            } catch (err) {
+                console.error('PDF Export Error:', err);
+                showToast('حدث خطأ أثناء تصدير PDF، جرب نافذة الطباعة');
+            } finally {
+                uninstallRasterBidiPatch();
+                isPdfExporting = false;
+                document.body.classList.remove('pdf-exporting-mode');
+                if (!wasInPreview) {
+                    document.body.classList.remove('a4-print-mode');
+                }
+                pdfButtons.forEach(btn => {
+                    btn.disabled = false;
+                    if (btn.dataset.originalHtml) btn.innerHTML = btn.dataset.originalHtml;
+                    delete btn.dataset.originalHtml;
+                });
+                drawFloorPlan();
+            }
+        }
+
+        // Ensure native Ctrl+P also prepares the canvas snapshot automatically
+        // and that a temporarily forced A4 view is dropped when the dialog closes.
+        window.addEventListener('beforeprint', prepareReportSnapshotForPrint);
+        window.addEventListener('afterprint', restoreViewAfterNativePrint);
+
+        // Single, One-Time Fast Initialization on Load (Zero background intervals!)
+        window.addEventListener('DOMContentLoaded', function () {
+            renderCatalogDropdown();
+            drawFloorPlan();
+            runStorageCalculations();
+            renderBoqTable();
+            syncPrintMirrors();
+            updateLiveTimestamp();
+            applyBidiDirectionPass(document.getElementById('printableReportContainer') || document.body);
+        });
+    </script>
+</body>
+</html>
